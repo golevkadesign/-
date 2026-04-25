@@ -1,0 +1,6 @@
+{
+  "name": "AI Personal Wealth Terminal",
+  "description": "An AI-driven wealth management dashboard with a built-in agent for asset tracking, market evaluation, and real-time visualization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

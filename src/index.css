@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-dash-bg: #111315; /* Arbitra dark background */
+  --color-dash-card: #181A1C; /* Arbitra card background */
+  --color-dash-cardHover: #1F2124;
+  --color-dash-gold: #32D77D; /* Map our 'gold' usages to the Arbitra Mint Green */
+  --color-dash-green: #32D77D;
+  --color-dash-red: #FA5050; /* Arbitra Red */
+  --color-dash-textMain: #FFFFFF;
+  --color-dash-textSub: #8A8B8F; /* Arbitra mute text */
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'monospace';
+}
+
+body {
+  background-color: var(--color-dash-bg);
+  color: var(--color-dash-textMain);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2A2B2D;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3A3B3D;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.ai-message p, .markdown-body p {
+  margin-bottom: 0.75rem;
+}
+.ai-message p:last-child, .markdown-body p:last-child {
+  margin-bottom: 0;
+}
+.ai-message strong, .markdown-body strong {
+  color: var(--color-dash-textMain);
+  font-weight: 600;
+}
+.ai-message ul, .markdown-body ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.ai-message ol, .markdown-body ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.ai-message h1, .markdown-body h1, .ai-message h2, .markdown-body h2, .ai-message h3, .markdown-body h3 {
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-dash-textMain);
+}
+.ai-message h4, .markdown-body h4 {
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.loading-dots:after {
+  content: '.';
+  animation: dots 1.5s steps(5, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0);}
+  40% { color: white; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0);}
+  60% { text-shadow: .25em 0 0 white, .5em 0 0 rgba(0,0,0,0);}
+  80%, 100% { text-shadow: .25em 0 0 white, .5em 0 0 white;}
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Arbitra style panels */
+.glass-panel {
+  background: var(--color-dash-card);
+  border: 1px solid #2A2B2D;
+  border-radius: 16px;
+}
