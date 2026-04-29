@@ -1,10 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
-import { getSettings, saveSettings, AppSettings } from './lib/settings.js';
-import { getUniversalAiClient } from './lib/ai-universal.js';
+import { getSettings, saveSettings, AppSettings } from './lib/settings';
+import { getUniversalAiClient } from './lib/ai-universal';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from './components/Card';
 import { ReactECharts } from './components/ReactECharts';
-import { SettingsModal } from './components/SettingsModal.js';
+import { SettingsModal } from './components/SettingsModal';
 import { loginWithGoogle, logout, subscribeToAuthChanges, db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
@@ -16,23 +16,26 @@ import { DeveloperView } from './components/DeveloperView';
 const ANALYSIS_PROMPT = `
 你是一个顶级 AI 私人财富总监 (Backend-Only Analysis Expert)。
 你的任务是深层测算，但不负责最终的排版和UI结构。
-你接收多模态内容和第三方系统（如Yahoo牌价、券商API等）聚合的数据。
+你接收多模态内容和第三方系统（如Yahoo牌价、券商API等）及各路顶尖Agent的深度诊断数据。\n严正声明：你会收到各领域Agent通过联网获取到的对某个实体资产/负债（如当地真实房价、按揭利率）的客观市调估值数据，提取关键结论时必须百分百采用这些真实市场市调数据进行财务测算推演，禁止自己凭空捏造数值。
 请全面分析当前的净资产、流动性、抗风险以及给定Tier层次的最佳破局点策略。
 返回严格彻底的分析纯JSON数据（仅包含核心观点和数据）。不要任何人类语言包裹。
 `;
 
 const UI_SUMMARY_PROMPT = `
 你是一个专业的前端 UI 生成引擎与总结文案大师 (Server-Driven UI Builder)。
-你接收底层分析师专家输出的硬核经济策略数据。
+你接收底层分析师专家输出的硬核经济策略数据，以及当前的 Terminal State。
 1. 请生成给用户看的【高情商且犀利的文字回复】(不要带json，纯文字即可)。
-2. 将数据组装为一个可用于前端渲染的 SDUI JSON Schema。
+2. 将数据组装为一个可用于前端渲染的 SDUI JSON Schema 更新补丁（Patch）。
+
 核心规则：
 - 除必须格式外，所有UI标题（如图表标题）使用中文。
-- metrics 中必须包含 netWorthSummary, liquiditySummary, safetyRatioSummary, fcfSummary 四个字段，用于在卡片下方展示一行精炼的结论性自然语言短句。
-- 对于股票持仓(publicHoldings)：如果掌握详细代码及市值数据，请尽量在 distributions.publicHoldings 中按股票代码(名)与价值枚举。
-- 对于期权(options)：如果有期权数据，请尽量在 distributions.options 中按具体期权(名)与价值枚举；若结构不清也可合并总期权价值。
-- 请在 insights 对象中，根据各板块图表的数据，分别提供专门负责该板块Agent的具体客观分析和切实施政建议（不需与大战略总目标挂钩，仅作为专家的独立观察结论）。支持的字段有：private, public(数组), options, fixedAssets, liquidity, expenses。
-重要更新指引：如果用户的现状分析中，未能明确推导出流动资金库分布(liquidity)、开支结构探测(expenses)或尚未定下确切总目标(goal)，你必须作为一个强主导的AI，主动根据用户的总体画像和已有净值数据，直接为他们**推荐或预测**这些内容填入数据字典中，绝不允许留空！例如基于常理给一个虚拟但极其合理的各类别占比，供用户后续调优。
+- metrics 中包含 netWorthSummary, liquiditySummary, safetyRatioSummary, fcfSummary 四个字段。
+- 对于股票持仓(publicHoldings)：如果有新分析，则在 \`insights.publicText\` 中输出纯文字结论（一只股票一行信息，枚举数量/成本/市值等）；在 \`insights.publicSummary\` 输出总体总结。
+- 对于期权(options)：提取并枚举。
+- 【严禁捏造Mock假数据】决不允许凭空捏造数值！
+- 请在 insights 对象中，提供专门负责该板块的Agent的具体客观分析和切实施政建议。
+- 重要：**增量更新（Differential Update）**。你只需要在 \`updateGlobalState\` 中返回**需要修改或更新**的字段。前端会将你的输出与当前的 Terminal State 进行合并（Shallow Merge / 深层合并）。对于完全没有变化的板块，**请直接省略该字段**，不要输出空数组/空字符串来覆盖原有的有效数据！！比如：如果你本次分析没有涉及 fixedAssets，那么 updateGlobalState 里面就不要出现 fixedAssets 字段。
+- 只做数据的更新，绝不重置旧的有效资产结构。如果在硬核经济策略数据中提到某些数据失效了或被抛售了，那才将其重置为 []。
 
 注意！返回的 JSON 必须符合以下严格结构：
 \`\`\`json
@@ -40,13 +43,13 @@ const UI_SUMMARY_PROMPT = `
   "aiReadableReply": "自然语言的解释...",
   "sduiSchema": [],
   "updateGlobalState": {
-    "metrics": { "netWorth": 1000000, "netWorthSummary": "总结短句...", "liquidity": 500000, "liquiditySummary": "总结短句...", "safetyRatio": 2.5, "safetyRatioSummary": "总结短句...", "fcf": 20000, "fcfSummary": "总结短句..." },
+    "metrics": { "netWorth": 1000000, "netWorthSummary": "总结短句..." },
     "userPersona": { "tags": ["稳健型", "高薪资"], "description": "您的核心画像..." },
     "goal": { "name": "核心破局目标", "current": 1000, "target": 5000, "index": 0.2 },
-    "distributions": { "liquidity": [{"name": "现金", "value": 100}], "expenses": [], "privateAssets": [], "publicHoldings": [{"name": "AAPL", "value": 100}], "options": [], "fixedAssets": [{"name": "房产", "marketValue": 5000000, "holdingCost": 2000000}] },
+    "distributions": { "liquidity": [{"name": "现金", "value": 100}] },
     "lifeStrategiesShort": [ { "timeNode": "2024-2025", "title": "节点1", "description": "描述" } ],
     "lifeStrategiesLong": [ { "timeNode": "未来 10 年", "title": "高维规划", "description": "描述" } ],
-    "insights": { "global": "宏观总结...", "private": "非公开资产专家分析...", "public": [{"symbol": "AAPL", "strategy": "策略..."}], "options": "期权板块客观分析...", "fixedAssets": "固定资产建议...", "liquidity": "资金池流动性建议...", "expenses": "开支结构诊断和改进..." }
+    "insights": { "liquidity": "资金池流动性建议..." }
   }
 }
 \`\`\`
@@ -110,15 +113,15 @@ const EMPTY_STATE = {
     fcf: 0,
     fcfSummary: '测算月结余'
   },
-  distributions: { liquidity: [], expenses: [], privateAssets: [], publicHoldings: [], fixedAssets: [] },
+  distributions: { liquidity: [], expenses: [], privateAssets: [], publicHoldings: [], fixedAssets: [], options: [] },
   goal: { name: '等待设定目标', current: 0, target: 1, index: 0 },
-  insights: { global: "等待数据注入...", private: "暂无非公开资产数据", public: [], publicGeneral: "暂无公开市场持仓" },
+  insights: { global: "等待数据注入...", private: "暂无非公开资产数据" },
   lifeStrategiesShort: [],
   lifeStrategiesLong: []
 };
 
-const formatMoney = (val: number | undefined) =>
-  val === undefined ? '-' : `¥${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+const formatMoney = (val: number | undefined | null) =>
+  val == null ? '-' : `¥${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 
 const fileToBase64 = (file: File): Promise<Attachment> =>
   new Promise((resolve, reject) => {
@@ -133,7 +136,7 @@ const fileToBase64 = (file: File): Promise<Attachment> =>
     reader.onerror = reject;
   });
 
-const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commitData }: any) => {
+const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIsSynthesizing, commitData }: any) => {
   const [inputMsg, setInputMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -141,41 +144,90 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+  const [showDrawerClearConfirm, setShowDrawerClearConfirm] = useState(false);
+  const isChatLoaded = useRef(false);
+
   // UI state for multi-turn dialog
   const [chatHistory, setChatHistory] = useState<{ user: string, ai: string, attachments: Attachment[], thinking?: string, isThinkingExpanded?: boolean }[]>([]);
 
   useEffect(() => {
-     if (user?.uid) {
-        const stored = localStorage.getItem(`ai_terminal_chat_${user.uid}`);
-        let targetStored = stored;
-        
-        if (!stored) {
-           const oldStored = localStorage.getItem('ai_terminal_chat');
-           if (oldStored) {
-               targetStored = oldStored;
-               localStorage.setItem(`ai_terminal_chat_${user.uid}`, oldStored);
-               localStorage.removeItem('ai_terminal_chat');
-           }
-        }
+    const handleClearChat = () => {
+        setChatHistory([]);
+    };
+    window.addEventListener('clear-chat-history', handleClearChat);
+    return () => window.removeEventListener('clear-chat-history', handleClearChat);
+  }, []);
 
-        if (targetStored) {
+  useEffect(() => {
+     if (user?.uid) {
+        const loadHistory = async () => {
            try {
-             const parsed = JSON.parse(targetStored);
-             setChatHistory(parsed.map((item: any) => ({
-               ...item,
-               attachments: item.attachments ? item.attachments : (item.img ? [{ mimeType: 'image/jpeg', data: item.img.split(',')[1], name: 'legacy_img.jpg' }] : [])
-             })));
-           } catch { setChatHistory([]); }
-        } else {
-           setChatHistory([]);
-        }
+              const snap = await getDoc(doc(db, "userProfiles", user.uid));
+              if (snap.exists() && snap.data().chatHistory) {
+                  setChatHistory(snap.data().chatHistory);
+                  localStorage.setItem(`ai_terminal_chat_${user.uid}`, JSON.stringify(snap.data().chatHistory));
+                  isChatLoaded.current = true;
+                  return;
+              }
+           } catch(e: any) { 
+              if (e.message && e.message.includes('offline')) {
+                 console.log("Offline mode: using local cache for chat history.");
+              } else {
+                 console.error("Failed to load chat history from firestore:", e);
+              }
+           }
+
+           // Fallback to localStorage if not found in Firestore
+           const stored = localStorage.getItem(`ai_terminal_chat_${user.uid}`);
+           let targetStored = stored;
+           
+           if (!stored) {
+              const oldStored = localStorage.getItem('ai_terminal_chat');
+              if (oldStored) {
+                  targetStored = oldStored;
+                  localStorage.setItem(`ai_terminal_chat_${user.uid}`, oldStored);
+                  localStorage.removeItem('ai_terminal_chat');
+              }
+           }
+
+           if (targetStored) {
+              try {
+                const parsed = JSON.parse(targetStored);
+                setChatHistory(parsed.map((item: any) => ({
+                  ...item,
+                  attachments: item.attachments ? item.attachments : (item.img ? [{ mimeType: 'image/jpeg', data: item.img.split(',')[1], name: 'legacy_img.jpg' }] : [])
+                })));
+              } catch { setChatHistory([]); }
+           } else {
+              setChatHistory([]);
+           }
+           isChatLoaded.current = true;
+        };
+        loadHistory();
      }
   }, [user?.uid]);
 
   useEffect(() => {
-    if (user?.uid) {
+    if (user?.uid && isChatLoaded.current) {
        localStorage.setItem(`ai_terminal_chat_${user.uid}`, JSON.stringify(chatHistory));
+       const timeoutId = setTimeout(() => {
+           // Prevent Firestore 1MB document size limit by stripping very large attachments and truncating thinking logs
+           const chatToSync = chatHistory.map(c => {
+               const newC = { ...c };
+               if (newC.thinking) {
+                   newC.thinking = newC.thinking.substring(0, 5000) + (newC.thinking.length > 5000 ? '\n...[truncated]' : '');
+               }
+               newC.attachments = newC.attachments?.map(att => ({
+                    ...att,
+                    // If attachment is larger than 100KB, remove its raw data from persistent storage to save space, keeping just metadata
+                    data: att.data.length > 100000 ? "" : att.data
+               })) || [];
+               Object.keys(newC).forEach(key => (newC as any)[key] === undefined && delete (newC as any)[key]);
+               return newC;
+           });
+           setDoc(doc(db, "userProfiles", user.uid), { chatHistory: chatToSync }, { merge: true }).catch(e => console.error("Failed to save chat to firestore:", e));
+       }, 2000);
+       return () => clearTimeout(timeoutId);
     }
   }, [chatHistory, user?.uid]);
 
@@ -258,6 +310,7 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
            history: chatHistory.map(c => ({ user: c.user, ai: c.ai })),
            contextData: data,
            settings: getSettings(),
+           userId: user?.uid,
            customApiKey: localStorage.getItem('custom_gemini_api_key') || undefined
         }),
         signal
@@ -277,8 +330,9 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
       if (reader) {
         let buffer = '';
         while (true) {
-          if (signal.aborted) break;
+          if (signal.aborted) throw new Error('AbortError');
           const { done, value } = await reader.read();
+          
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
@@ -292,6 +346,9 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
                    const parsed = JSON.parse(dataStr);
                    if (parsed.type === 'progress') {
                       thinkingProgress += parsed.message + '\n';
+                      if (parsed.message.includes("各节点数据已回流") || parsed.message.includes("CEO 级全局 Synthesizer")) {
+                          setIsSynthesizing?.(true);
+                      }
                       setChatHistory(prev => {
                          const newHist = [...prev];
                          newHist[newHist.length - 1].thinking = thinkingProgress.trim();
@@ -300,6 +357,19 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
                          }
                          return newHist;
                       });
+                   } else if (parsed.type === 'partial_result') {
+                      bffData = { ...bffData, ...parsed.data };
+                      // Eagerly merge Live Portfolio to bypass AI latency and ensure badge
+                      if (parsed.data.externalData?.livePortfolio && parsed.data.externalData.livePortfolio.length > 0) {
+                          commitData((prevData: any) => ({
+                              ...prevData,
+                              distributions: {
+                                  ...prevData.distributions,
+                                  publicHoldings: parsed.data.externalData.livePortfolio
+                              },
+                              _liveSources: ['longbridge']
+                          }));
+                      }
                    } else if (parsed.type === 'result') {
                       bffData = parsed.data;
                    } else if (parsed.type === 'error') {
@@ -321,12 +391,25 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
       if (bffData.updatedProfile && Object.keys(bffData.updatedProfile).length > 0) {
           try {
               if (user?.uid) {
-                  await setDoc(doc(db, "userProfiles", user.uid), bffData.updatedProfile);
+                  await setDoc(doc(db, "userProfiles", user.uid), { userProfile: bffData.updatedProfile }, { merge: true });
                   commitData({ ...data, userProfile: bffData.updatedProfile });
               }
           } catch(e) {
               console.error("Failed to save profile to Firestore:", e);
           }
+      }
+      
+      // 1.6 Eagerly merge Live Portfolio to bypass AI latency and ensure badge
+      if (bffData.externalData?.livePortfolio && bffData.externalData.livePortfolio.length > 0) {
+          // Merge it early so it renders instantly
+          commitData((prevData: any) => ({
+              ...prevData,
+              distributions: {
+                  ...prevData.distributions,
+                  publicHoldings: bffData.externalData.livePortfolio
+              },
+              _liveSources: ['longbridge']
+          }));
       }
 
       // If it's a quick reply, short circuit
@@ -354,6 +437,7 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
          history: chatHistory.map(c => ({ user: c.user, ai: c.ai })),
          currentNetWorthTier: bffData.userTier,
          marketQuotesYahooRAG: bffData.externalData.marketData,
+         livePortfolioRAG: bffData.externalData.livePortfolio,
          expertAnalysis: bffData.expertAnalysis,
          userProfileRAG: bffData.updatedProfile || data.userProfile,
          terminalState: data,
@@ -390,7 +474,7 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
       if (signal.aborted) throw new Error('AbortError');
 
       // 3. Client-side UI Summary Agent
-      const summaryInput = `Tier: ${bffData.userTier}\nUserMsg: ${userMsg}\nHardcore Analysis Result:\n${analysisText}`;
+      const summaryInput = `Tier: ${bffData.userTier}\nUserMsg: ${userMsg}\nHardcore Analysis Result:\n${analysisText}\n\nCurrent Terminal State (SDUI JSON):\n${JSON.stringify(data, null, 2)}`;
       const summaryResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: summaryInput,
@@ -422,14 +506,20 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
       }
       
       if (sduiPayload?.updateGlobalState) {
-         commitData({ 
-            ...data, 
+         commitData((prevData: any) => ({ 
+            ...prevData, 
             ...sduiPayload.updateGlobalState, 
-            metrics: { ...data.metrics, ...(sduiPayload.updateGlobalState.metrics || {}) },
-            distributions: { ...data.distributions, ...(sduiPayload.updateGlobalState.distributions || {}) },
-            insights: { ...data.insights, ...(sduiPayload.updateGlobalState.insights || {}) },
-            goal: sduiPayload.updateGlobalState.goal || data.goal
-         });
+            metrics: { ...prevData.metrics, ...(sduiPayload.updateGlobalState.metrics || {}) },
+            distributions: { 
+                ...prevData.distributions, 
+                ...(sduiPayload.updateGlobalState.distributions || {}),
+                // Ensure AI doesn't accidentally overwrite deterministic live portfolio
+                ...(bffData.externalData?.livePortfolio ? { publicHoldings: bffData.externalData.livePortfolio } : {})
+            },
+            insights: { ...prevData.insights, ...(sduiPayload.updateGlobalState.insights || {}) },
+            goal: sduiPayload.updateGlobalState.goal || prevData.goal,
+            _liveSources: bffData.externalData?.livePortfolio ? ['longbridge'] : []
+         }));
       }
 
     } catch (error: any) {
@@ -443,7 +533,9 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
         if (errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE')) {
            errMsg = "API 当前负载较高 (503 Service Unavailable)。需求激增通常是暂时的，请您稍后重试。";
         } else if (errMsg.includes('API key not valid') || errMsg.includes('API_KEY_INVALID')) {
-           errMsg = "获取到的 Gemini API Key 无效。请点击编辑器右上角（或左下角）的设置 (Settings) 图标 -> Secrets，检查或清除您手动填写的 GEMINI_API_KEY。";
+           errMsg = "获取到的 API Key 无效。请点击环境的 Settings -> Secrets 面板，检查并清除或同步更新您自定义的 API_KEY。";
+        } else if (errMsg.includes('exceeded your current quota') || errMsg.includes('rate limits') || errMsg.includes('Quota exceeded') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('monthly spending cap')) {
+           errMsg = "API 额度已耗尽 (Resource Exhausted - Quota Exceeded)。您配置的 API Key 免费额度/速率或可用资金余额已达上限，请检查计费层级或更换 Key 后重试。";
         } else if (errMsg.includes('{')) {
             try {
                 const parsed = JSON.parse(errMsg.substring(errMsg.indexOf('{')));
@@ -455,6 +547,7 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
       });
     } finally {
       setIsLoading(false);
+      setIsSynthesizing?.(false);
       abortControllerRef.current = null;
     }
   };
@@ -474,16 +567,27 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, commi
         </div>
         <div className="flex items-center gap-2">
            {chatHistory.length > 0 && (
-             <button 
-               onClick={() => {
-                   if(window.confirm('确认清除当前会话历史？')) {
-                       setChatHistory([]);
-                   }
-               }} 
-               className="text-[11px] text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 hover:border-rose-500/50 hover:bg-rose-500/10 transition-all flex items-center gap-1.5 font-medium"
-             >
-               <RefreshCw className="w-3.5 h-3.5" /> 清除屏显
-             </button>
+              <div className="relative">
+                 <button 
+                   onClick={() => setShowDrawerClearConfirm(true)} 
+                   className="text-[11px] text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 hover:border-rose-500/50 hover:bg-rose-500/10 transition-all flex items-center gap-1.5 font-medium"
+                 >
+                   <RefreshCw className="w-3.5 h-3.5" /> 清除屏显
+                 </button>
+                 
+                 {showDrawerClearConfirm && (
+                   <>
+                     <div className="fixed inset-0 z-40" onClick={() => setShowDrawerClearConfirm(false)}></div>
+                     <div className="absolute right-0 top-full mt-2 w-64 bg-[#111315] border border-rose-500/30 rounded-xl p-4 shadow-xl z-50 animate-in fade-in slide-in-from-top-2">
+                        <p className="text-xs text-dash-textMain mb-3 leading-relaxed">此操作仅清除屏幕显示，系统仍保有长期记忆。确认清除？</p>
+                        <div className="flex justify-end gap-2">
+                           <button onClick={() => setShowDrawerClearConfirm(false)} className="px-3 py-1.5 bg-white/5 border border-white/10 text-dash-textSub text-xs rounded hover:bg-white/10 hover:text-white transition-colors">取消</button>
+                           <button onClick={() => { setChatHistory([]); setShowDrawerClearConfirm(false); }} className="px-3 py-1.5 bg-rose-600/20 text-rose-500 border border-rose-500/30 text-xs rounded hover:bg-rose-600 hover:text-white transition-colors">确认清除</button>
+                        </div>
+                     </div>
+                   </>
+                 )}
+              </div>
            )}
            <button onClick={() => setIsDrawerOpen(false)} className="p-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg transition-colors text-dash-textSub hover:text-white ml-2 shadow-sm">
              <X className="w-5 h-5" />
@@ -570,6 +674,7 @@ export default function App() {
   const [data, setData] = useState<any>(EMPTY_STATE);
 
   const [sduiState, setSduiState] = useState<any[]>([]);
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showDeveloperView, setShowDeveloperView] = useState(false);
   const [nodePlans, setNodePlans] = useState<Record<string, { status: 'idle'|'thinking'|'done', result: string, thinking: string }>>({});
@@ -595,16 +700,29 @@ export default function App() {
              }
          }
 
-         // Fetch userProfile from Firestore
+         // Fetch userProfile and appData from Firestore
          try {
            const profileSnap = await getDoc(doc(db, "userProfiles", u.uid));
            if (profileSnap.exists()) {
-              localState = { ...localState, userProfile: profileSnap.data() };
+              const fsData = profileSnap.data();
+              if (fsData.appData && Object.keys(fsData.appData).length > 0) {
+                 localState = { ...localState, ...fsData.appData };
+                 localStorage.setItem(`ai_terminal_data_${u.uid}`, JSON.stringify(localState));
+              }
+              if (fsData.userProfile) {
+                 localState = { ...localState, userProfile: fsData.userProfile };
+              } else if (!fsData.appData && !fsData.chatHistory) {
+                 localState = { ...localState, userProfile: fsData };
+              }
            } else {
               localState = { ...localState, userProfile: {} };
            }
-         } catch(e) {
-           console.error("Failed to load user profile from firestore:", e);
+         } catch(e: any) {
+           if (e.message && e.message.includes('offline')) {
+             console.log("Offline mode: using local state for profile.");
+           } else {
+             console.error("Failed to load user profile from firestore:", e);
+           }
            localState = { ...localState, userProfile: {} };
          }
          
@@ -617,11 +735,17 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const commitData = (newData: any) => {
-    setData(newData);
-    if (user?.uid) {
-        localStorage.setItem(`ai_terminal_data_${user.uid}`, JSON.stringify(newData));
-    }
+  const commitData = (newDataOrUpdater: any) => {
+    setData((prev: any) => {
+      const newData = typeof newDataOrUpdater === 'function' ? newDataOrUpdater(prev) : newDataOrUpdater;
+      if (user?.uid) {
+          localStorage.setItem(`ai_terminal_data_${user.uid}`, JSON.stringify(newData));
+          const appDataToSave = { ...newData };
+          delete appDataToSave.userProfile; // RAG profile saved separately
+          setDoc(doc(db, "userProfiles", user.uid), { appData: appDataToSave }, { merge: true }).catch(e => console.error("Failed to commit appData to firestore:", e));
+      }
+      return newData;
+    });
   };
 
   const donutOption = useMemo(() => {
@@ -662,7 +786,7 @@ export default function App() {
     const mainData = arr.map((v: any) => v.value).concat([total]);
 
     return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[1].name + ' : ¥' + p[1].value.toLocaleString() },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[1].name + ' : ¥' + (p[1].value?.toLocaleString() || 0) },
       grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
       xAxis: { type: 'category', splitLine: { show: false }, data: names.length > 1 ? names : ['无数据'], axisLabel: { color: '#94a3b8', interval: 0, formatter: (val: string) => val.length > 4 ? val.slice(0, 4) + '...' : val } },
       yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1A1D21', type: 'dashed' } }, axisLabel: { show: false } },
@@ -678,24 +802,70 @@ export default function App() {
 
   const holdingsOption = useMemo(() => {
     const arr = data.distributions?.publicHoldings || [];
-    const symbols = arr.map((v: any) => v.name);
-    const values = arr.map((v: any) => v.value);
+    // Sort array by value to make horizontal chart look better (descending)
+    const sortedArr = [...arr].sort((a: any, b: any) => (a.value ?? a.marketValue ?? 0) - (b.value ?? b.marketValue ?? 0));
+    
+    const symbols = sortedArr.map((v: any) => v.name || v.symbol || '未知');
+    const values = sortedArr.map((v: any) => v.value ?? v.marketValue ?? 0);
+    
     return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[0].name + ' : ¥' + p[0].value.toLocaleString() },
-      grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
-      xAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#94a3b8', interval: 0, rotate: symbols.length > 4 ? 30 : 0 } }],
-      yAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#1A1D21', type: 'dashed' } }, axisLabel: { show: false } }],
-      series: [{ type: 'bar', label: { show: true, position: 'top', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: '#14b8a6', fontSize: 10 }, barWidth: '40%', data: values.length ? values : [0], itemStyle: { color: '#14b8a6', borderRadius: [4, 4, 0, 0] } }]
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[0].name + ' : ¥' + (p[0].value?.toLocaleString() || 0) },
+      grid: { left: '3%', right: '15%', bottom: '5%', top: '5%', containLabel: true },
+      dataZoom: [
+        {
+          type: 'inside',
+          yAxisIndex: 0,
+          start: sortedArr.length > 8 ? Math.floor((1 - 8 / sortedArr.length) * 100) : 0, 
+          end: 100
+        },
+        {
+          type: 'slider',
+          yAxisIndex: 0,
+          show: sortedArr.length > 8,
+          width: 12,
+          right: 0,
+          borderColor: 'transparent',
+          backgroundColor: '#1E293B',
+          fillerColor: '#38BDF855',
+          handleSize: '100%',
+        }
+      ],
+      xAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#1A1D21', type: 'dashed' } }, axisLabel: { show: false } }],
+      yAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#94a3b8', interval: 0, width: 80, overflow: 'truncate' } }],
+      series: [{ 
+        type: 'bar', 
+        label: { show: true, position: 'right', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: '#14b8a6', fontSize: 10 }, 
+        barWidth: '60%', 
+        data: values.length ? values : [0], 
+        itemStyle: { color: '#14b8a6', borderRadius: [0, 4, 4, 0] } 
+      }]
     };
   }, [data.distributions?.publicHoldings]);
 
   const optionsOption = useMemo(() => {
     const arr = data.distributions?.options || [];
-    const symbols = arr.map((v: any) => v.name);
-    const values = arr.map((v: any) => v.value);
+    const symbols = arr.map((v: any) => v.name || v.symbol || '未知');
+    const values = arr.map((v: any) => v.value ?? v.marketValue ?? 0);
     return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[0].name + ' : ¥' + p[0].value.toLocaleString() },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[0].name + ' : ¥' + (p[0].value?.toLocaleString() || 0) },
       grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
+      dataZoom: [
+        {
+          type: 'inside',
+          start: 0,
+          end: arr.length > 5 ? Math.floor((5 / arr.length) * 100) : 100
+        },
+        {
+          type: 'slider',
+          show: arr.length > 5,
+          height: 12,
+          bottom: 0,
+          borderColor: 'transparent',
+          backgroundColor: '#1E293B',
+          fillerColor: '#38BDF855',
+          handleSize: '100%',
+        }
+      ],
       xAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#94a3b8', interval: 0, rotate: symbols.length > 4 ? 30 : 0 } }],
       yAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#1A1D21', type: 'dashed' } }, axisLabel: { show: false } }],
       series: [{ type: 'bar', label: { show: true, position: 'top', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: '#0369a1', fontSize: 10 }, barWidth: '40%', data: values.length ? values : [0], itemStyle: { color: '#0369a1', borderRadius: [4, 4, 0, 0] } }]
@@ -805,9 +975,9 @@ export default function App() {
       if (errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE')) {
          errMsg = "API 当前负载较高 (503 Service Unavailable)。需求激增通常是暂时的，请稍后再试。";
       } else if (errMsg.includes('API key not valid') || errMsg.includes('API_KEY_INVALID')) {
-         errMsg = "获取到的 Gemini API Key 无效。请点击此环境的 Settings（设置） -> Secrets 面板，检查并清除或更新您自定义的 GEMINI_API_KEY。";
-      } else if (errMsg.includes('exceeded your current quota') || errMsg.includes('rate limits') || errMsg.includes('Quota exceeded') || errMsg.includes('429')) {
-         errMsg = "API 额度已耗尽 (Resource Exhausted - 429 Quota Exceeded)。您当前的 Gemini API 请求次数/速率已达上限，请稍后重试或检查计费层级。";
+         errMsg = "获取到的 API Key 无效。请点击此环境的 Settings（设置） -> Secrets 面板，检查并清除或更新您自定义的 API_KEY。";
+      } else if (errMsg.includes('exceeded your current quota') || errMsg.includes('rate limits') || errMsg.includes('Quota exceeded') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('monthly spending cap')) {
+         errMsg = "API 额度已耗尽 (Resource Exhausted - Quota Exceeded)。您配置的 API Key 免费额度/速率或可用资金余额已达上限，请稍微重试或检查计费层级。";
       } else if (errMsg.includes('{')) {
           try {
               const parsed = JSON.parse(errMsg.substring(errMsg.indexOf('{')));
@@ -835,7 +1005,12 @@ export default function App() {
       }
       localStorage.removeItem(`ai_terminal_data_${user.uid}`);
       localStorage.removeItem(`ai_terminal_chat_${user.uid}`);
-      window.location.reload();
+      
+      setData(EMPTY_STATE);
+      setSduiState([]);
+      setNodePlans({});
+      setShowClearConfirm(false);
+      window.dispatchEvent(new Event('clear-chat-history'));
     }
   };
 
@@ -943,10 +1118,7 @@ export default function App() {
         </motion.div>
 
       {sduiState.length > 0 && (
-        <div className="mb-10 w-full p-6 bg-[#0a0f1c] rounded-2xl border border-dash-gold/30 shadow-[0_0_30px_rgba(255,215,0,0.05)]">
-           <h2 className="text-xl font-bold text-dash-gold mb-6 border-b border-dash-gold/20 pb-4">
-             AI Director 动态下发视图 (SDUI)
-           </h2>
+        <div className="mb-10 w-full">
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
              {sduiState.map((block, i) => {
                const Component = ComponentRegistry[block.component];
@@ -981,6 +1153,7 @@ export default function App() {
         {/* 流动资金库 */}
         {data.distributions?.liquidity?.length > 0 && (
           <ChartWidget 
+            status={isSynthesizing ? "loading" : undefined}
             title="流动资金池"
             dataLength={data.distributions?.liquidity?.length || 0}
             insight={data.insights?.liquidity}
@@ -989,34 +1162,37 @@ export default function App() {
           />
         )}
 
-        {/* 公开市场持仓 */}
+        {/* 公开市场持仓分析 (Text Card) */}
+        {data.insights?.publicText && data.distributions?.publicHoldings?.length > 0 && (
+          <Card 
+            title="公开市场持仓评估" 
+            delay={0.15} 
+            className="border-[#8b5cf6]/30 bg-[#1A1D21]/50 backdrop-blur-md"
+            badge={data._liveSources?.includes('longbridge') ? <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">Live Source</span> : <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-500/10 text-slate-400 border border-slate-500/20">RAG Memory</span>}
+          >
+            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap p-2 markdown-body">
+               <Markdown>{data.insights.publicText}</Markdown>
+            </div>
+          </Card>
+        )}
+
+        {/* 公开市场持仓横向图表 (Chart Card) */}
         {(data.distributions?.publicHoldings?.length > 0) && (
           <ChartWidget 
-            title="公开市场持仓"
+            status={isSynthesizing ? "loading" : undefined}
+            title="公开市场持仓视图"
             dataLength={data.distributions?.publicHoldings?.length || 0}
-            insight={
-              data.insights?.public ? (
-                <div className="space-y-3">
-                  {Array.isArray(data.insights.public) ? data.insights.public.map((item: any, idx: number) => (
-                    <div key={idx} className="bg-dash-bg p-4 rounded-xl border border-[#2A2B2D]">
-                      <div className="text-white font-mono text-sm font-semibold mb-2">{item.symbol}</div>
-                      <div className="text-xs text-slate-400 leading-relaxed">{item.strategy}</div>
-                    </div>
-                  )) : (
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">{data.insights.public}</p>
-                  )}
-                </div>
-              ) : undefined
-            }
+            insight={data.insights?.publicSummary}
             option={holdingsOption}
             delay={0.2}
-            chartHeight="200px"
+            chartHeight="300px"
           />
         )}
 
         {/* 期权及衍生品 */}
         {data.distributions?.options?.length > 0 && (
           <ChartWidget 
+            status={isSynthesizing ? "loading" : undefined}
             title="衍生品及期权"
             dataLength={data.distributions?.options?.length || 0}
             insight={data.insights?.options}
@@ -1029,6 +1205,7 @@ export default function App() {
         {/* 非公开资产 */}
         {(data.distributions?.privateAssets?.length > 0 || (data.insights?.private && data.insights.private !== "暂无非公开资产数据")) && (
           <ChartWidget 
+            status={isSynthesizing ? "loading" : undefined}
             title="非公开资产估值"
             dataLength={data.distributions?.privateAssets?.length || (data.insights?.private && data.insights.private !== "暂无非公开资产数据" ? 1 : 0)}
             insight={data.insights?.private}
@@ -1041,6 +1218,7 @@ export default function App() {
         {/* 预估固定资产 */}
         {data.distributions?.fixedAssets?.length > 0 && (
           <ChartWidget 
+            status={isSynthesizing ? "loading" : undefined}
             title="固定资产与负债估值"
             dataLength={data.distributions?.fixedAssets?.length || 0}
             insight={data.insights?.fixedAssets}
@@ -1070,6 +1248,7 @@ export default function App() {
         {/* 开支结构 */}
         {data.distributions?.expenses?.length > 0 && (
           <ChartWidget 
+            status={isSynthesizing ? "loading" : undefined}
             title="开支结构分析"
             dataLength={data.distributions?.expenses?.length || 0}
             insight={data.insights?.expenses}
@@ -1205,7 +1384,7 @@ export default function App() {
           <div className="flex-1">
             <h3 className="text-xl sm:text-2xl font-semibold text-white break-words">{data.goal?.name || "战略目标"}</h3>
             <p className="text-xs sm:text-sm text-dash-textSub mt-2 font-mono break-all sm:break-normal">
-              当前进度: <span className="text-white">¥{data.goal?.current?.toLocaleString()}</span> / ¥{data.goal?.target?.toLocaleString()}
+              当前进度: <span className="text-white">¥{data.goal?.current?.toLocaleString() || 0}</span> / ¥{data.goal?.target?.toLocaleString() || 0}
             </p>
           </div>
           <div className="text-left sm:text-right">
@@ -1257,6 +1436,7 @@ export default function App() {
         user={user} 
         data={data} 
         setSduiState={setSduiState} 
+        setIsSynthesizing={setIsSynthesizing}
         commitData={commitData}
       />
     </div>

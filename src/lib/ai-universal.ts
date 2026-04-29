@@ -1,4 +1,4 @@
-import { getSettings } from './settings.js';
+import { getSettings } from './settings';
 import { GoogleGenAI } from '@google/genai';
 
 // Simple polyfill for generateContentStream for OpenAI
@@ -78,6 +78,30 @@ async function fetchOpenAI(apiKey: string, model: string, messages: any[], tempe
 export const getUniversalAiClient = (passedSettings?: any) => {
   const getS = () => passedSettings || getSettings();
 
+  const retryOperation = async (operation: () => Promise<any>, maxRetries = 3, baseDelay = 1000) => {
+    let attempt = 0;
+    while (true) {
+      try {
+        const result = await operation();
+        return result;
+      } catch (error: any) {
+        attempt++;
+        const errMessage = error?.message || String(error);
+        const errStatus = error?.status || error?.code || (error?.response?.status);
+        const errJsonString = JSON.stringify(error) || '';
+        const isTransient = errMessage.includes('503') || errMessage.includes('UNAVAILABLE') || errMessage.includes('fetch failed') || errMessage.includes('ECONNRESET') || errMessage.includes('HeadersTimeoutError') || errMessage.includes('overloaded') || errMessage.includes('temporarily down') || errStatus === 503 || errStatus === 'UNAVAILABLE' || errJsonString.includes('503') || errJsonString.includes('UNAVAILABLE');
+        
+        if (!isTransient || attempt >= maxRetries) {
+          throw error;
+        }
+        
+        const delay = baseDelay * Math.pow(1.5, attempt - 1);
+        console.log(`[AI Retry] Transient error encountered, retrying (${attempt}/${maxRetries}) in ${delay}ms...`, errMessage);
+        await new Promise(res => setTimeout(res, delay));
+      }
+    }
+  };
+
   return {
     models: {
       generateContentStream: async ({ model, contents, config }: any) => {
@@ -110,13 +134,22 @@ export const getUniversalAiClient = (passedSettings?: any) => {
              msgs.push({ role: contents.role === 'model' ? 'assistant' : 'user', content: contents.parts.map((p:any) => p.text).join('\n') });
           }
           
-          return fetchOpenAIStream(apiKey, targetModel, msgs, config?.temperature ?? 0.3);
+          return retryOperation(() => fetchOpenAIStream(apiKey, targetModel, msgs, config?.temperature ?? 0.3));
         } else {
           targetModel = model.includes('flash') ? settings.geminiFastModel : settings.geminiAdvancedModel;
           const apiKey = settings.geminiKey || process.env.GEMINI_API_KEY;
           if (!apiKey) throw new Error("缺少 Gemini API Key");
           const ai = new GoogleGenAI({ apiKey });
-          return ai.models.generateContentStream({ model: targetModel, contents, config });
+
+          let overrideConfig = { ...config };
+          if (!overrideConfig.tools) {
+            overrideConfig.tools = [];
+          }
+          if (!overrideConfig.tools.some((t: any) => t.googleSearch || t.google_search)) {
+             overrideConfig.tools.push({ googleSearch: {} });
+          }
+
+          return retryOperation(() => ai.models.generateContentStream({ model: targetModel, contents, config: overrideConfig }));
         }
       },
       generateContent: async ({ model, contents, config }: any) => {
@@ -148,13 +181,22 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           }
           
           const isJsonMode = config?.responseMimeType === 'application/json';
-          return fetchOpenAI(apiKey, targetModel, msgs, config?.temperature ?? 0.3, isJsonMode);
+          return retryOperation(() => fetchOpenAI(apiKey, targetModel, msgs, config?.temperature ?? 0.3, isJsonMode));
         } else {
           targetModel = model.includes('flash') ? settings.geminiFastModel : settings.geminiAdvancedModel;
           const apiKey = settings.geminiKey || process.env.GEMINI_API_KEY;
           if (!apiKey) throw new Error("缺少 Gemini API Key");
           const ai = new GoogleGenAI({ apiKey });
-          return ai.models.generateContent({ model: targetModel, contents, config });
+          
+          let overrideConfig = { ...config };
+          if (!overrideConfig.tools) {
+            overrideConfig.tools = [];
+          }
+          if (!overrideConfig.tools.some((t: any) => t.googleSearch || t.google_search)) {
+             overrideConfig.tools.push({ googleSearch: {} });
+          }
+
+          return retryOperation(() => ai.models.generateContent({ model: targetModel, contents, config: overrideConfig }));
         }
       }
     }

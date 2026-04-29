@@ -2,20 +2,30 @@ export interface AppSettings {
   provider: 'gemini' | 'openai';
   geminiKey: string;
   openaiKey: string;
+  longbridgeAppKey?: string;
+  longbridgeAppSecret?: string;
+  longbridgeKey?: string;
   geminiFastModel: string;
   geminiAdvancedModel: string;
   openaiFastModel: string;
   openaiAdvancedModel: string;
+  agentPrompts?: Record<string, string>;
+  ragSchema?: string;
 }
 
 export const defaultSettings: AppSettings = {
   provider: 'gemini',
   geminiKey: '',
   openaiKey: '',
+  longbridgeAppKey: '',
+  longbridgeAppSecret: '',
+  longbridgeKey: '',
   geminiFastModel: 'gemini-3-flash-preview',
   geminiAdvancedModel: 'gemini-3.1-pro-preview',
   openaiFastModel: 'gpt-4o-mini',
   openaiAdvancedModel: 'gpt-4o',
+  agentPrompts: {},
+  ragSchema: '',
 };
 
 export const getSettings = (): AppSettings => {

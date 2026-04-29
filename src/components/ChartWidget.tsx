@@ -13,9 +13,10 @@ interface ChartWidgetProps {
   children?: React.ReactNode;
   status?: 'loading' | 'empty' | 'error' | 'success'; 
   onReload?: () => void;
+  badge?: React.ReactNode;
 }
 
-export function ChartWidget({ title, dataLength, insight, option, delay = 0, chartHeight = '250px', children, status, onReload }: ChartWidgetProps) {
+export function ChartWidget({ title, dataLength, insight, option, delay = 0, chartHeight = '250px', children, status, onReload, badge }: ChartWidgetProps) {
   // If status is provided, use it, else derive from dataLength
   const currentStatus = status || (dataLength > 0 ? 'success' : 'empty');
 
@@ -28,6 +29,7 @@ export function ChartWidget({ title, dataLength, insight, option, delay = 0, cha
     >
       <h3 className="text-[14px] font-semibold text-white mb-4 flex justify-between items-center z-10 shrink-0">
         <span className="flex items-center gap-2">{title}</span>
+        {badge && <div>{badge}</div>}
       </h3>
       
       {currentStatus === 'loading' && (

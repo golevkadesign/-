@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Settings, Loader2, RefreshCw } from 'lucide-react';
-import { getSettings, saveSettings as persistSettings, AppSettings } from '../lib/settings.js';
+import { getSettings, saveSettings as persistSettings, AppSettings } from '../lib/settings';
 
 export const SettingsModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [settings, setSettings] = useState<AppSettings>(getSettings());
@@ -127,6 +127,9 @@ export const SettingsModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                       >
                          <option value="gemini-3-flash-preview">gemini-3-flash-preview (默认)</option>
                          <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                         {settings.geminiFastModel && !['gemini-3-flash-preview', 'gemini-2.5-flash'].includes(settings.geminiFastModel) && !availableGeminiModels.includes(settings.geminiFastModel) && (
+                            <option value={settings.geminiFastModel}>{settings.geminiFastModel} (已保存)</option>
+                         )}
                          {availableGeminiModels.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
@@ -139,6 +142,9 @@ export const SettingsModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                       >
                          <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (默认)</option>
                          <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                         {settings.geminiAdvancedModel && !['gemini-3.1-pro-preview', 'gemini-2.5-pro'].includes(settings.geminiAdvancedModel) && !availableGeminiModels.includes(settings.geminiAdvancedModel) && (
+                            <option value={settings.geminiAdvancedModel}>{settings.geminiAdvancedModel} (已保存)</option>
+                         )}
                          {availableGeminiModels.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
@@ -175,6 +181,9 @@ export const SettingsModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                       >
                          <option value="gpt-4o-mini">gpt-4o-mini (默认)</option>
                          <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                         {settings.openaiFastModel && !['gpt-4o-mini', 'gpt-3.5-turbo'].includes(settings.openaiFastModel) && !availableOpenAIModels.includes(settings.openaiFastModel) && (
+                            <option value={settings.openaiFastModel}>{settings.openaiFastModel} (已保存)</option>
+                         )}
                          {availableOpenAIModels.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
@@ -188,6 +197,9 @@ export const SettingsModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                          <option value="gpt-4o">gpt-4o (默认)</option>
                          <option value="o3-mini">o3-mini</option>
                          <option value="o1-preview">o1-preview</option>
+                         {settings.openaiAdvancedModel && !['gpt-4o', 'o3-mini', 'o1-preview'].includes(settings.openaiAdvancedModel) && !availableOpenAIModels.includes(settings.openaiAdvancedModel) && (
+                            <option value={settings.openaiAdvancedModel}>{settings.openaiAdvancedModel} (已保存)</option>
+                         )}
                          {availableOpenAIModels.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
@@ -195,6 +207,50 @@ export const SettingsModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                 </div>
               </>
             )}
+          </div>
+          
+          <div className="bg-[#181A1C] border border-[#2A2B2D] rounded-xl p-5 space-y-5 relative">
+            <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2 border-b border-[#2A2B2D] pb-3">
+              外部数据连接源 (External Data Providers)
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Longbridge App Key</label>
+                <input
+                  type="text"
+                  value={settings.longbridgeAppKey || ''}
+                  onChange={(e) => setSettings({...settings, longbridgeAppKey: e.target.value})}
+                  placeholder="App Key (若使用 OAuth Token 则留空)"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-dash-textMain focus:outline-none focus:border-emerald-500/50 font-mono transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Longbridge App Secret</label>
+                <input
+                  type="password"
+                  value={settings.longbridgeAppSecret || ''}
+                  onChange={(e) => setSettings({...settings, longbridgeAppSecret: e.target.value})}
+                  placeholder="App Secret (若使用 OAuth Token 则留空)"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-dash-textMain focus:outline-none focus:border-emerald-500/50 font-mono transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Longbridge Access Token</label>
+                <input
+                  type="password"
+                  value={settings.longbridgeKey || ''}
+                  onChange={(e) => setSettings({...settings, longbridgeKey: e.target.value})}
+                  placeholder="在此输入您的 Access Token (或 OAuth Token)..."
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-dash-textMain focus:outline-none focus:border-emerald-500/50 font-mono transition-colors"
+                />
+              </div>
+              <p className="text-xs text-dash-textSub mt-2 leading-relaxed">
+                用于自动同步美港股实时持仓、盈亏状况进入智能推演网络。API Key 鉴权模式需要同时填写 App Key, App Secret 和 Access Token。如果您拥有的是 OAuth 获取的 Auth Token，由于无需计算 HMAC 签名，您可以直接仅填写 Access Token 字段。
+              </p>
+            </div>
           </div>
           
           <div className="text-xs text-dash-textSub leading-relaxed">
