@@ -3,9 +3,17 @@ import { extractTickers } from "./utils";
 
 import * as crypto from 'crypto';
 
+interface DataProviderParams {
+    message: string;
+    contextData: any;
+    settings: any;
+    userId?: string;
+    extractedTickers?: string[];
+}
+
 export interface DataProvider {
     name: string;
-    fetch(params: { message: string, contextData: any, settings: any, userId?: string }): Promise<{ source: string, payload: any }>;
+    fetch(params: DataProviderParams): Promise<{ source: string, payload: any }>;
 }
 
 const CACHE_TTL = 5 * 60 * 1000;
@@ -14,9 +22,13 @@ const cache = new Map<string, { timestamp: number, data: any }>();
 class YahooFinanceProvider implements DataProvider {
     name = "YahooFinance";
     
-    async fetch({ message, contextData }: any) {
-        const allText = message + JSON.stringify(contextData?.distributions?.publicHoldings || []);
-        const symbolsToFetch = extractTickers(allText);
+    async fetch({ message, contextData, extractedTickers }: DataProviderParams) {
+        let symbolsToFetch = extractedTickers || [];
+        if (!symbolsToFetch || symbolsToFetch.length === 0) {
+            const allText = message + JSON.stringify(contextData?.distributions?.publicHoldings || []);
+            symbolsToFetch = extractTickers(allText);
+        }
+        
         if (symbolsToFetch.length === 0) return { source: this.name, payload: null };
         
         const cacheKey = `yahoo_${symbolsToFetch.sort().join('_')}`;
@@ -43,9 +55,9 @@ class LongbridgeLiveProvider implements DataProvider {
         // According to architecture, Longbridge API Key should be stored in Firestore's private user config.
         // We'd load it here using Firebase Admin SDK: `const userSettings = await admin.firestore().collection('userPrivate').doc(userId).get();`
         // Fallback to client provided settings or env var.
-        let accessToken = (settings?.longbridgeKey || process.env.LONGBRIDGE_ACCESS_TOKEN || '').trim();
-        let appKey = (settings?.longbridgeAppKey || process.env.LONGBRIDGE_APP_KEY || '').trim();
-        let appSecret = (settings?.longbridgeAppSecret || process.env.LONGBRIDGE_APP_SECRET || '').trim();
+        let accessToken = (settings?.longbridgeKey || '').trim();
+        let appKey = (settings?.longbridgeAppKey || '').trim();
+        let appSecret = (settings?.longbridgeAppSecret || '').trim();
         
         if (!accessToken) {
             return { source: this.name, payload: null };
@@ -162,12 +174,9 @@ class LongbridgeLiveProvider implements DataProvider {
                 }
 
                 const normalizedData = { livePortfolio };
-                
-                // Write raw data for debugging
-                import('fs').then(fs => fs.writeFileSync('longbridge_raw.json', JSON.stringify(lbData, null, 2)));
 
-                cache.set(cacheKey, { timestamp: Date.now(), data: { payload: normalizedData, raw: lbData } });
-                return { source: this.name, payload: normalizedData, raw: lbData, cleaned: normalizedData };
+                cache.set(cacheKey, { timestamp: Date.now(), data: { payload: normalizedData } });
+                return { source: this.name, payload: normalizedData };
             } else {
                  console.log("Longbridge Open API returned error code:", lbData.code, "message:", lbData.message, "data:", lbData.data);
                  return { source: this.name, payload: null, raw: lbData };
@@ -194,25 +203,18 @@ export const dataProviders: DataProvider[] = [
     new LongbridgeLiveProvider()
 ];
 
-export async function hydrateContext(message: string, contextData: any, settings: any, onProgress?: (msg: string) => void, userId?: string) {
+export async function hydrateContext(message: string, contextData: any, settings: any, onProgress?: (msg: string) => void, userId?: string, extractedTickers: string[] = []) {
     if (onProgress) onProgress("⏳ [阶段 2.1] 启动 Context Hydrator 进行子节点并发提取调度...");
     
     // Run all providers concurrently
     const results = await Promise.all(
-        dataProviders.map(p => p.fetch({ message, contextData, settings, userId }))
+        dataProviders.map(p => p.fetch({ message, contextData, settings, userId, extractedTickers }))
     );
     
     const hydratedData: any = { marketData: {} };
     const sources: string[] = [];
     
     for (const res of results) {
-        if ((res as any).raw && res.source.startsWith("LongbridgeLive")) {
-            if (onProgress) {
-               const rawStr = JSON.stringify((res as any).raw, null, 2);
-               const cleanedStr = (res as any).cleaned ? JSON.stringify((res as any).cleaned, null, 2) : "None (可能有抛错或无清算数据)";
-               onProgress(`✅ [阶段 2.2] [Longbridge API 状态: ${res.source}]\n\n🎯 清洗后持仓数据:\n\`\`\`json\n${cleanedStr}\n\`\`\`\n\n🔍 API 响应/报错原文 (截取前1000字符):\n\`\`\`json\n${rawStr.substring(0, 1000)}${rawStr.length > 1000 ? '\n... (truncated)' : ''}\n\`\`\``);
-            }
-        }
         if (res.payload) {
             sources.push(res.source);
             if (res.source.startsWith("YahooFinance")) {

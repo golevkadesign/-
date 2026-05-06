@@ -13,7 +13,50 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(cors());
+  // Rate Limiting (Simple In-Memory)
+  const rateLimitMap = new Map<string, { count: number, resetTime: number }>();
+  
+  // Clean up expired entries every 10 minutes to prevent memory leak
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, record] of rateLimitMap.entries()) {
+      if (now > record.resetTime) {
+         rateLimitMap.delete(ip);
+      }
+    }
+  }, 10 * 60 * 1000).unref?.();
+
+  app.use("/api/chat", (req, res, next) => {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      let record = rateLimitMap.get(ip);
+      
+      // Reset every 10 minutes
+      if (!record || now > record.resetTime) {
+          record = { count: 0, resetTime: now + 10 * 60 * 1000 };
+      }
+      
+      // Limit to 50 requests per 10 minutes per IP
+      if (record.count >= 50) {
+          res.status(429).json({ error: "Too many requests. Please try again later." });
+          return;
+      }
+      
+      record.count++;
+      rateLimitMap.set(ip, record);
+      next();
+  });
+
+  const corsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        if (!origin || origin.includes('localhost') || origin.includes('.run.app') || origin.includes('google.com')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
+  };
+  app.use(cors(corsOptions));
   app.use(express.json({ limit: "50mb" }));
 
   // API Configuration

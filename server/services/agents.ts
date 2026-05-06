@@ -1,7 +1,7 @@
 import { getUniversalAiClient } from "../../src/lib/ai-universal";
 import { DEFAULT_PROMPTS } from "../../src/lib/defaultPrompts";
 
-export async function runAnalysisAgent(userTier: string, contextData: any, history: any[], section: string, query: string, settings?: any) {
+export async function runAnalysisAgent(userTier: string, contextData: any, history: any[], section: string, query: string, settings?: any, attachments: any[] = []) {
   const ai = getUniversalAiClient(settings);
   
   let systemPrompt = "";
@@ -27,20 +27,29 @@ export async function runAnalysisAgent(userTier: string, contextData: any, histo
   }
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: `系统设定：\n${systemPrompt}\n\n当前用户所处层级：${userTier}\n\n历史对话记录：\n${JSON.stringify(history)}\n\n上下文数据：\n${JSON.stringify(contextData)}\n\n用户的需求/提问：\n${query}` }
-          ]
+    let parts: any[] = [{ text: `系统设定：\n${systemPrompt}\n\n当前用户所处层级：${userTier}\n\n历史对话记录：\n${JSON.stringify(history)}\n\n上下文数据：\n${JSON.stringify(contextData)}\n\n用户的需求/提问：\n${query}` }];
+    if (attachments && attachments.length > 0) {
+       attachments.forEach((att: any) => {
+          if (att.data) parts.push({ inlineData: { data: att.data, mimeType: att.mimeType } });
+       });
+    }
+
+    let timeoutId: any;
+    const response = await Promise.race([
+      ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            role: "user",
+            parts
+          }
+        ],
+        config: {
+          temperature: 0.2, // 保持专业性和稳定性
         }
-      ],
-      config: {
-        temperature: 0.2, // 保持专业性和稳定性
-      }
-    });
+      }),
+      new Promise<any>((_, reject) => { timeoutId = setTimeout(() => reject(new Error('Agent AI Timeout')), 60000); })
+    ]).finally(() => clearTimeout(timeoutId));
     return response.text;
   } catch (error: any) {
     console.error(`Agent Error (${section}):`, error);

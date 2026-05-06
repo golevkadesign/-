@@ -116,7 +116,8 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           
           let msgs = [];
           if (config?.systemInstruction) {
-             msgs.push({ role: 'system', content: config.systemInstruction });
+             const sysInst = config.systemInstruction + "\n[System Environment Notice: You do NOT have a live search tool connected. Please rely on provided context or estimate reasonably, and do NOT fail just because you cannot search online.]";
+             msgs.push({ role: 'system', content: sysInst });
           }
           
           // format contents
@@ -134,7 +135,7 @@ export const getUniversalAiClient = (passedSettings?: any) => {
              msgs.push({ role: contents.role === 'model' ? 'assistant' : 'user', content: contents.parts.map((p:any) => p.text).join('\n') });
           }
           
-          return retryOperation(() => fetchOpenAIStream(apiKey, targetModel, msgs, config?.temperature ?? 0.3));
+          return fetchOpenAIStream(apiKey, targetModel, msgs, config?.temperature ?? 0.3);
         } else {
           targetModel = model.includes('flash') ? settings.geminiFastModel : settings.geminiAdvancedModel;
           const apiKey = settings.geminiKey || process.env.GEMINI_API_KEY;
@@ -142,13 +143,7 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           const ai = new GoogleGenAI({ apiKey });
 
           let overrideConfig = { ...config };
-          if (!overrideConfig.tools) {
-            overrideConfig.tools = [];
-          }
-          if (!overrideConfig.tools.some((t: any) => t.googleSearch || t.google_search)) {
-             overrideConfig.tools.push({ googleSearch: {} });
-          }
-
+          
           return retryOperation(() => ai.models.generateContentStream({ model: targetModel, contents, config: overrideConfig }));
         }
       },
@@ -163,7 +158,8 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           
           let msgs = [];
           if (config?.systemInstruction) {
-             msgs.push({ role: 'system', content: config.systemInstruction });
+             const sysInst = config.systemInstruction + "\n[System Environment Notice: You do NOT have a live search tool connected. Please rely on provided context or estimate reasonably, and do NOT fail just because you cannot search online.]";
+             msgs.push({ role: 'system', content: sysInst });
           }
           
           if (Array.isArray(contents)) {
@@ -189,13 +185,7 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           const ai = new GoogleGenAI({ apiKey });
           
           let overrideConfig = { ...config };
-          if (!overrideConfig.tools) {
-            overrideConfig.tools = [];
-          }
-          if (!overrideConfig.tools.some((t: any) => t.googleSearch || t.google_search)) {
-             overrideConfig.tools.push({ googleSearch: {} });
-          }
-
+          
           return retryOperation(() => ai.models.generateContent({ model: targetModel, contents, config: overrideConfig }));
         }
       }

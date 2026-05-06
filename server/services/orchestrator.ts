@@ -35,7 +35,9 @@ ${JSON.stringify(history.slice(-3))}
       }
     });
 
-    const output = JSON.parse(response.text || "{}");
+    let text = response.text || "{}";
+    text = text.replace(/```(?:json)?\n?/gi, '').replace(/```\n?/g, '').trim();
+    const output = JSON.parse(text);
     return {
       requiresDeepAnalysis: output.requiresDeepAnalysis ?? true,
       quickReply: output.quickReply || "",
@@ -55,7 +57,7 @@ ${JSON.stringify(history.slice(-3))}
 }
 
 // 根据用户层级和输入，编排并调用对应的子Agent
-export async function evaluateWealthStatus(userTier: string, message: string, history: any[], externalData: any, onProgress?: (msg: string) => void, settings?: any, targetModules: string[] = []) {
+export async function evaluateWealthStatus(userTier: string, message: string, history: any[], externalData: any, onProgress?: (msg: string) => void, settings?: any, targetModules: string[] = [], attachments: any[] = []) {
   let agentTasks: Promise<any>[] = [];
   let agentResults: Record<string, string> = {};
 
@@ -65,12 +67,10 @@ export async function evaluateWealthStatus(userTier: string, message: string, hi
   if (onProgress) onProgress(`⏳ [阶段 3.1] Orchestrator 核心调度：基于 ${userTier} 分发并行分析线程...`);
 
   // 根据Tier和上下文，并行调用不同的专家Agent分析各个板块
-  const shouldRun = (moduleName: string) => targetModules.length === 0 || targetModules.includes(moduleName);
-
-  if (userTier === "Debt Focus" && shouldRun("Debt Focus")) {
+  if ((targetModules.length === 0 && userTier === "Debt Focus") || (targetModules.length > 0 && targetModules.includes("Debt Focus"))) {
     if (onProgress) onProgress(`⏳ [子节点派发] 唤醒 Debt Crisis Intervention Advisor 专属通道...`);
     agentTasks.push(
-      runAnalysisAgent(userTier, externalData, history, "Debt Focus", message, settings).then((res: any) => { 
+      runAnalysisAgent(userTier, externalData, history, "Debt Focus", message, settings, attachments).then((res: any) => { 
         agentResults['债务与现金流诊断'] = res; 
         if (onProgress) onProgress(`\n✅ **[阶段 3.x] [债务专家评估完成]**\n${res}\n\n---\n`);
       }).catch(e => {
@@ -78,10 +78,12 @@ export async function evaluateWealthStatus(userTier: string, message: string, hi
         throw e;
       })
     );
-  } else if (userTier === "High Net Worth Individual" && shouldRun("High Net Worth")) {
+  } 
+  
+  if ((targetModules.length === 0 && userTier === "High Net Worth Individual") || (targetModules.length > 0 && targetModules.includes("High Net Worth"))) {
     if (onProgress) onProgress(`⏳ [子节点派发] 拉起 UHNWI 家族办公室专属资源...`);
     agentTasks.push(
-      runAnalysisAgent(userTier, externalData, history, "High Net Worth", message, settings).then((res: any) => { 
+      runAnalysisAgent(userTier, externalData, history, "High Net Worth", message, settings, attachments).then((res: any) => { 
         agentResults['家族财富与资产配置'] = res; 
         if (onProgress) onProgress(`\n✅ **[阶段 3.x] [家族理财评估完成]**\n${res}\n\n---\n`);
       }).catch(e => {
@@ -89,10 +91,12 @@ export async function evaluateWealthStatus(userTier: string, message: string, hi
         throw e;
       })
     );
-  } else if (userTier !== "Debt Focus" && userTier !== "High Net Worth Individual" && shouldRun("General Finance")) {
+  } 
+  
+  if ((targetModules.length === 0 && userTier !== "Debt Focus" && userTier !== "High Net Worth Individual") || (targetModules.length > 0 && targetModules.includes("General Finance"))) {
     if (onProgress) onProgress(`⏳ [子节点派发] 连通 CFP 全栖财务规划师节点...`);
     agentTasks.push(
-      runAnalysisAgent(userTier, externalData, history, "General Finance", message, settings).then((res: any) => { 
+      runAnalysisAgent(userTier, externalData, history, "General Finance", message, settings, attachments).then((res: any) => { 
         agentResults['综合理财规划'] = res; 
         if (onProgress) onProgress(`\n✅ **[阶段 3.x] [个人综合财务评估完成]**\n${res}\n\n---\n`);
       }).catch(e => {
@@ -102,12 +106,14 @@ export async function evaluateWealthStatus(userTier: string, message: string, hi
     );
   }
 
+  const shouldRun = (moduleName: string) => targetModules.length === 0 || targetModules.includes(moduleName);
+
   // 如果有市场数据（股票等），额外拉起市场分析Agent
   if (shouldRun("Market Analysis") && ((externalData?.marketData && Object.keys(externalData.marketData).length > 0) ||
       (externalData?.livePortfolio && externalData.livePortfolio.length > 0))) {
     if (onProgress) onProgress(`⏳ [子节点派发] 请求外部数据交汇汇流，唤醒华尔街量化分析节点...`);
     agentTasks.push(
-      runAnalysisAgent(userTier, externalData, history, "Market Analysis", "请帮我分析我持有的或提到的这些标的", settings).then((res: any) => { 
+      runAnalysisAgent(userTier, externalData, history, "Market Analysis", "请帮我分析我持有的或提到的这些标的", settings, attachments).then((res: any) => { 
         agentResults['市场与标的分析'] = res; 
         if (onProgress) onProgress(`\n✅ **[阶段 3.x] [量化趋势推演完成]**\n${res}\n\n---\n`);
       }).catch(e => {
@@ -120,7 +126,7 @@ export async function evaluateWealthStatus(userTier: string, message: string, hi
   if (shouldRun("Devil Advocate")) {
     if (onProgress) onProgress(`⏳ [子节点派发] 唤醒 Devil's Advocate (杠精节点) 进行抗脆性黑天鹅压测...`);
     agentTasks.push(
-      runAnalysisAgent(userTier, externalData, history, "Devil Advocate", message, settings).then((res: any) => { 
+      runAnalysisAgent(userTier, externalData, history, "Devil Advocate", message, settings, attachments).then((res: any) => { 
         agentResults['极端压力测试与黑天鹅警告'] = res; 
         if (onProgress) onProgress(`\n✅ **[阶段 3.x] [黑天鹅杠精压测完成]**\n${res}\n\n---\n`);
       }).catch(e => {
@@ -144,27 +150,35 @@ export async function evaluateWealthStatus(userTier: string, message: string, hi
   try {
     const template = settings?.agentPrompts?.orchestrator || DEFAULT_PROMPTS.orchestrator;
     const summaryPrompt = template
-      .replace('{userTier}', userTier)
-      .replace('{message}', message)
-      .replace('{userProfileRAG}', JSON.stringify(externalData?.contextData?.userProfile || {}, null, 2))
-      .replace('{livePortfolioRAG}', JSON.stringify(externalData?.livePortfolio || externalData?.contextData?.distributions?.publicHoldings || [], null, 2))
-      .replace('{agentResults}', JSON.stringify(agentResults, null, 2));
+      .replace('{userTier}', () => userTier)
+      .replace('{message}', () => message)
+      .replace('{userProfileRAG}', () => JSON.stringify(externalData?.contextData?.userProfile || {}, null, 2))
+      .replace('{livePortfolioRAG}', () => JSON.stringify(externalData?.livePortfolio || externalData?.contextData?.distributions?.publicHoldings || [], null, 2))
+      .replace('{agentResults}', () => JSON.stringify(agentResults, null, 2));
 
     let response;
     try {
-      response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: summaryPrompt,
-        config: { temperature: 0.1 }
-      });
+      let timeoutId: any;
+      response = await Promise.race([
+        ai.models.generateContent({
+          model: "gemini-3.1-pro-preview",
+          contents: summaryPrompt,
+          config: { temperature: 0.1 }
+        }),
+        new Promise<any>((_, reject) => { timeoutId = setTimeout(() => reject(new Error('Agent AI Timeout (Synthesizer)')), 60000); })
+      ]).finally(() => clearTimeout(timeoutId));
     } catch (e: any) {
       console.error("Synthesizer pro model error, falling back to flash:", e);
       if (onProgress) onProgress(`⚠️ [阶段 3.9] Pro模型高负载，降级至Flash模型进行全局汇总...`);
-      response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview", // Use flash preview
-        contents: summaryPrompt,
-        config: { temperature: 0.1 }
-      });
+      let timeoutId: any;
+      response = await Promise.race([
+        ai.models.generateContent({
+          model: "gemini-3-flash-preview", // Use flash preview
+          contents: summaryPrompt,
+          config: { temperature: 0.1 }
+        }),
+        new Promise<any>((_, reject) => { timeoutId = setTimeout(() => reject(new Error('Agent AI Timeout (Synthesizer Flash)')), 60000); })
+      ]).finally(() => clearTimeout(timeoutId));
     }
 
     agentResults['综合统筹结论'] = response?.text || "";

@@ -138,17 +138,18 @@ const fileToBase64 = (file: File): Promise<Attachment> =>
 
 const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIsSynthesizing, commitData }: any) => {
   const [inputMsg, setInputMsg] = useState('');
+  const [syncProfile, setSyncProfile] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [displayMax, setDisplayMax] = useState(10);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [showDrawerClearConfirm, setShowDrawerClearConfirm] = useState(false);
   const isChatLoaded = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // UI state for multi-turn dialog
-  const [chatHistory, setChatHistory] = useState<{ user: string, ai: string, attachments: Attachment[], thinking?: string, isThinkingExpanded?: boolean }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ user: string, ai: string, attachments: Attachment[], thinking?: string, isThinkingExpanded?: boolean, hasMemoryUpdate?: boolean, _liveSources?: string[] }[]>([]);
 
   useEffect(() => {
     const handleClearChat = () => {
@@ -204,6 +205,9 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
            isChatLoaded.current = true;
         };
         loadHistory();
+     } else {
+        isChatLoaded.current = false;
+        setChatHistory([]);
      }
   }, [user?.uid]);
 
@@ -220,7 +224,8 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
                newC.attachments = newC.attachments?.map(att => ({
                     ...att,
                     // If attachment is larger than 100KB, remove its raw data from persistent storage to save space, keeping just metadata
-                    data: att.data.length > 100000 ? "" : att.data
+                    data: att.data.length > 100000 ? "" : att.data,
+                    isTruncated: att.data.length > 100000
                })) || [];
                Object.keys(newC).forEach(key => (newC as any)[key] === undefined && delete (newC as any)[key]);
                return newC;
@@ -230,12 +235,6 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
        return () => clearTimeout(timeoutId);
     }
   }, [chatHistory, user?.uid]);
-
-  useEffect(() => {
-    if (isDrawerOpen && chatEndRef.current) {
-      chatEndRef.current.scrollIntoView();
-    }
-  }, [chatHistory, isDrawerOpen]);
   
   const handlePaste = async (e: React.ClipboardEvent) => {
     if (e.clipboardData.files && e.clipboardData.files.length > 0) {
@@ -311,7 +310,9 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
            contextData: data,
            settings: getSettings(),
            userId: user?.uid,
-           customApiKey: localStorage.getItem('custom_gemini_api_key') || undefined
+           customApiKey: localStorage.getItem('custom_gemini_api_key') || undefined,
+           attachments: attsToSend,
+           skipMemoryUpdate: !syncProfile
         }),
         signal
       });
@@ -353,7 +354,7 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
                          const newHist = [...prev];
                          newHist[newHist.length - 1].thinking = thinkingProgress.trim();
                          if (newHist[newHist.length - 1].isThinkingExpanded === undefined) {
-                            newHist[newHist.length - 1].isThinkingExpanded = true;
+                            newHist[newHist.length - 1].isThinkingExpanded = false;
                          }
                          return newHist;
                       });
@@ -369,6 +370,13 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
                               },
                               _liveSources: ['longbridge']
                           }));
+                      }
+                      if (parsed.data.updatedProfile && Object.keys(parsed.data.updatedProfile).length > 0) {
+                          setChatHistory(prev => {
+                             const newHist = [...prev];
+                             newHist[newHist.length - 1].hasMemoryUpdate = true;
+                             return newHist;
+                          });
                       }
                    } else if (parsed.type === 'result') {
                       bffData = parsed.data;
@@ -388,14 +396,14 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
       if (!bffData) throw new Error("未能从服务器获取核心分析数据。(Timeout or Stream Empty)");
 
       // 1.5 Handle permanent RAG profile updates
-      if (bffData.updatedProfile && Object.keys(bffData.updatedProfile).length > 0) {
+      if (bffData.updatedProfile && Object.keys(bffData.updatedProfile).length > 0 && syncProfile) {
           try {
               if (user?.uid) {
                   await setDoc(doc(db, "userProfiles", user.uid), { userProfile: bffData.updatedProfile }, { merge: true });
                   commitData({ ...data, userProfile: bffData.updatedProfile });
               }
           } catch(e) {
-              console.error("Failed to save profile to Firestore:", e);
+              console.error("Failed to commit profile updates:", e);
           }
       }
       
@@ -423,58 +431,14 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
          return;
       }
       
-      // 2. Client-side Analysis Agent Execution
-      const parts: any[] = [];
-      if (attsToSend && attsToSend.length > 0) {
-        for (const file of attsToSend) {
-          parts.push({
-            inlineData: { mimeType: file.mimeType, data: file.data }
-          });
-        }
-      }
-      
-      const contextStr = JSON.stringify({
-         history: chatHistory.map(c => ({ user: c.user, ai: c.ai })),
-         currentNetWorthTier: bffData.userTier,
-         marketQuotesYahooRAG: bffData.externalData.marketData,
-         livePortfolioRAG: bffData.externalData.livePortfolio,
-         expertAnalysis: bffData.expertAnalysis,
-         userProfileRAG: bffData.updatedProfile || data.userProfile,
-         terminalState: data,
-         userMessage: userMsg
-      });
-      
-      parts.push({ text: `请根据以下综合金融切片进行深度核心策略演算：\n\n${contextStr}` });
-
-      const ai = getUniversalAiClient();
-      const responseStream = await ai.models.generateContentStream({
-        model: "gemini-3.1-pro-preview",
-        contents: [{ role: "user", parts }],
-        config: {
-          systemInstruction: ANALYSIS_PROMPT,
-          temperature: 0.2
-        }
-      });
-      
-      const initialThinking = thinkingProgress.trim();
-      let analysisText = '';
-      for await (const chunk of responseStream) {
-         if (signal.aborted) throw new Error('AbortError');
-         analysisText += chunk.text;
-         const thinkMatch = analysisText.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
-         if (thinkMatch) {
-            setChatHistory(prev => {
-               const newHist = [...prev];
-               newHist[newHist.length - 1].thinking = initialThinking + '\n\n' + thinkMatch[1].trim();
-               return newHist;
-            });
-         }
-      }
-      
-      if (signal.aborted) throw new Error('AbortError');
+      const analysisText = Object.entries(bffData.expertAnalysis || {})
+         .map(([k, v]) => `[${k}]\n${typeof v === 'string' ? v : JSON.stringify(v)}`)
+         .join('\n\n');
 
       // 3. Client-side UI Summary Agent
       const summaryInput = `Tier: ${bffData.userTier}\nUserMsg: ${userMsg}\nHardcore Analysis Result:\n${analysisText}\n\nCurrent Terminal State (SDUI JSON):\n${JSON.stringify(data, null, 2)}`;
+      
+      const ai = getUniversalAiClient();
       const summaryResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: summaryInput,
@@ -487,12 +451,23 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
       if (signal.aborted) throw new Error('AbortError');
       
       const txt = summaryResponse.text || "";
-      const jsonMatch = txt.match(/```json\n([\s\S]*?)\n```/);
       let sduiPayload: any = null;
-      if (jsonMatch && jsonMatch[1]) {
-        try {
-          sduiPayload = JSON.parse(jsonMatch[1]);
-        } catch(e) { console.error("Parse SDUI error:", e); }
+      try {
+        let cleanedTxt = txt;
+        const jsonMatch = txt.match(/```(?:json)?\n([\s\S]*?)\n```/);
+        if (jsonMatch && jsonMatch[1]) {
+           cleanedTxt = jsonMatch[1];
+        } else {
+           cleanedTxt = txt.replace(/```(?:json)?\n?/gi, '').replace(/```\n?/g, '').trim();
+        }
+        
+        const startIdx = cleanedTxt.indexOf('{');
+        const endIdx = cleanedTxt.lastIndexOf('}');
+        if (startIdx !== -1 && endIdx !== -1) {
+           sduiPayload = JSON.parse(cleanedTxt.substring(startIdx, endIdx + 1));
+        }
+      } catch(e) { 
+        console.error("Parse SDUI error:", e); 
       }
 
       setChatHistory(prev => {
@@ -553,7 +528,28 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
   };
 
   return (
-    <div className={`fixed inset-y-0 right-0 w-full sm:w-[500px] md:w-[600px] bg-dash-bg border-l border-[#2A2B2D] z-50 transform transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] shadow-2xl flex flex-col ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+    <div 
+      className={`fixed inset-y-0 right-0 w-full sm:w-[500px] md:w-[600px] bg-dash-bg border-l border-[#2A2B2D] z-50 transform transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] shadow-2xl flex flex-col ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+      onDrop={async (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const files = Array.from(e.dataTransfer.files);
+          const newAtts = await Promise.all(files.map(file => fileToBase64(file)));
+          setAttachments(prev => [...prev, ...newAtts]);
+        }
+      }}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 z-[100] bg-dash-gold/10 backdrop-blur-sm border-2 border-dashed border-dash-gold flex items-center justify-center">
+           <div className="bg-[#111315] p-6 rounded-2xl shadow-2xl flex flex-col items-center pointer-events-none">
+              <Upload className="w-10 h-10 mb-4 text-dash-gold animate-bounce" />
+              <p className="text-white font-semibold text-lg">释放即可上传文件 (Drop to Upload)</p>
+           </div>
+        </div>
+      )}
       
       <div className="p-4 sm:p-6 border-b border-[#2A2B2D] flex justify-between items-center bg-dash-card relative z-10">
         <div className="flex items-center gap-3">
@@ -602,7 +598,7 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
               msgs.push({ role: 'user', content: c.user || '', attachments: c.attachments });
            }
            if (c.ai || (i === chatHistory.length - 1 && isLoading) || c.thinking) {
-              msgs.push({ role: 'assistant', content: c.ai || '', thinking: c.thinking });
+              msgs.push({ role: 'assistant', content: c.ai || '', thinking: c.thinking, hasMemoryUpdate: c.hasMemoryUpdate, _liveSources: data._liveSources });
            }
            return msgs;
         })} 
@@ -611,8 +607,8 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
         onQuickPrompt={(prompt: string) => handleAiSubmit(prompt)}
       />
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 pb-0 w-full border-t border-white/5 bg-[#0B0D0F]/70 backdrop-saturate-[180%] backdrop-blur-[20px]">
-        <div className="max-w-4xl mx-auto flex flex-col p-4 sm:p-6 pb-8 sm:pb-6 relative transition-all ease-[cubic-bezier(0.4,0,0.2,1)] duration-300">
+      <div className="absolute bottom-0 left-0 right-0 z-40 pb-0 w-full border-t border-white/5 bg-[#0B0D0F]/70 backdrop-saturate-[180%] backdrop-blur-[20px]">
+        <div className="mx-auto flex flex-col p-4 sm:p-6 pb-8 sm:pb-6 relative transition-all ease-[cubic-bezier(0.4,0,0.2,1)] duration-300">
             {attachments.length > 0 && (
                <div className="flex flex-wrap gap-2 mb-3">
                  {attachments.map((att, i) => (
@@ -659,6 +655,12 @@ const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIs
                    onPaste={handlePaste}
                    hasAttachments={attachments.length > 0}
                  />
+                 <div className="absolute top-[-30px] right-2 flex items-center gap-2">
+                   <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer hover:text-slate-200 transition-colors bg-[#1A1D21] px-2 py-1 rounded border border-white/5">
+                     <input type="checkbox" className="rounded bg-slate-800 border-slate-600 outline-none w-3 h-3 text-dash-green focus:ring-0 focus:ring-offset-0" checked={syncProfile} onChange={(e) => setSyncProfile(e.target.checked)} />
+                     <span>写入长线记忆</span>
+                   </label>
+                 </div>
                </div>
             </div>
         </div>
@@ -1109,7 +1111,7 @@ export default function App() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 pt-6 mb-8 md:mb-10"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 pt-0 mb-8"
         >
           <Card title="总净资产 (Net Worth)" value={formatMoney(data.metrics?.netWorth)} subValue={data.metrics?.netWorthSummary} isLongSubText />
           <Card title="可用现金池 (Liquidity)" value={formatMoney(data.metrics?.liquidity)} subValue={data.metrics?.liquiditySummary} isLongSubText />

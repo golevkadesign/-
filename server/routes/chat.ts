@@ -12,7 +12,41 @@ export const chatRouter = Router();
 // Existing legacy route (We keep this intact to avoid breaking anything)
 chatRouter.post("/", async (req, res) => {
   let isResponseEnded = false;
+  let requestAborted = false;
   let keepAlive: NodeJS.Timeout | undefined;
+
+  req.on('close', () => {
+    requestAborted = true;
+    console.log("[chat] Client disconnected. Aborting backend tasks.");
+  });
+
+  const sendProgress = (msg: string) => {
+    if (!isResponseEnded) {
+      res.write(`data: ${JSON.stringify({ type: 'progress', message: msg })}\n\n`);
+      // Vercel / Cloud Run standard flush if available
+      if ('flush' in res && typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
+    }
+  };
+
+  const sendPartialResult = (data: any) => {
+    if (!isResponseEnded) {
+      res.write(`data: ${JSON.stringify({ type: 'partial_result', data })}\n\n`);
+      if ('flush' in res && typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
+    }
+  };
+
+  const sendResult = (data: any) => {
+    if (!isResponseEnded) {
+      isResponseEnded = true;
+      clearInterval(keepAlive);
+      res.write(`data: ${JSON.stringify({ type: 'result', data })}\n\n`);
+      res.end();
+    }
+  };
 
   try {
     res.writeHead(200, {
@@ -30,36 +64,8 @@ chatRouter.post("/", async (req, res) => {
       }
     }, 5000);
 
-    const sendProgress = (msg: string) => {
-      if (!isResponseEnded) {
-        res.write(`data: ${JSON.stringify({ type: 'progress', message: msg })}\n\n`);
-        // Vercel / Cloud Run standard flush if available
-        if ('flush' in res && typeof (res as any).flush === 'function') {
-          (res as any).flush();
-        }
-      }
-    };
-
-    const sendPartialResult = (data: any) => {
-      if (!isResponseEnded) {
-        res.write(`data: ${JSON.stringify({ type: 'partial_result', data })}\n\n`);
-        if ('flush' in res && typeof (res as any).flush === 'function') {
-          (res as any).flush();
-        }
-      }
-    };
-
-    const sendResult = (data: any) => {
-      if (!isResponseEnded) {
-        isResponseEnded = true;
-        clearInterval(keepAlive);
-        res.write(`data: ${JSON.stringify({ type: 'result', data })}\n\n`);
-        res.end();
-      }
-    };
-
     sendProgress("⏳ [阶段 0] 已接收通讯矩阵指令与上下文凭证...");
-    const { message, contextData = {}, history = [], customApiKey, settings, userProfile = {}, userId } = req.body;
+    const { message, contextData = {}, history = [], customApiKey, settings, userProfile = {}, userId, attachments = [], skipMemoryUpdate = false } = req.body;
     
     const passedSettings = settings || {};
     if (customApiKey && !passedSettings.geminiKey) passedSettings.geminiKey = customApiKey;
@@ -71,7 +77,7 @@ chatRouter.post("/", async (req, res) => {
     let userTier = "General";
     if (netWorth < 0) userTier = "Debt Focus";
     else if (netWorth > 10000000) userTier = "High Net Worth Individual";
-    else if (netWorth > 1000000) userTier = "Middle Class";
+    else if (netWorth > 1000000) userTier = "Emerging Wealth";
 
     // 1. Intent Recognition and Summarization using lightweight model (gemini-3.1-flash)
     console.log("[Intent] Assessing message intent using Flash...");
@@ -111,19 +117,41 @@ ${ragSchema}
 }
 `;
 
-    let intentResult = { requiresDeepAnalysis: true, summary: message, quickReply: "", updatedProfile: userProfile, targetModules: [] };
+    let intentResult = { requiresDeepAnalysis: true, summary: message, quickReply: "", updatedProfile: userProfile, targetModules: [], extractedTickers: [] };
+    
+    let intentParts: any[] = [{ text: intentPrompt }];
+    if (attachments && attachments.length > 0) {
+       attachments.forEach((att: any) => {
+          if (att.data) intentParts.push({ inlineData: { data: att.data, mimeType: att.mimeType } });
+       });
+    }
+
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: intentPrompt,
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0.1,
-        }
+      let timeoutId: any;
+      const timeoutPromise = new Promise<any>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Agent AI Timeout (Intent Analysis)')), 15000);
       });
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: [{ role: "user", parts: intentParts }],
+          config: {
+            temperature: 0.1,
+          }
+        }),
+        timeoutPromise
+      ]).finally(() => clearTimeout(timeoutId));
+      
       if (response.text) {
-        intentResult = JSON.parse(response.text);
-        sendProgress(`✅ [阶段 1] 意图及记忆更新完成 (需要深度分析: ${intentResult.requiresDeepAnalysis})。`);
+        let text = response.text.replace(/```(?:json)?\n?/gi, '').replace(/```\n?/g, '').trim();
+        if (text.startsWith('{')) {
+          intentResult = JSON.parse(text);
+        } else {
+          throw new Error("Invalid format from intent model");
+        }
+        sendProgress(`✅ [阶段 1] 意图网络分析完成。`);
+        if (intentResult.targetModules?.length > 0) sendProgress(`🔍 [锁定分析模块]: ${intentResult.targetModules.join(', ')}`);
+        if (intentResult.extractedTickers?.length > 0) sendProgress(`📦 [提取到标的资产]: ${intentResult.extractedTickers.join(', ')}`);
       }
     } catch (e: any) {
       console.error("[Intent] parsing failed", e);
@@ -138,8 +166,10 @@ ${ragSchema}
     }
     
     // We update the aggregated data to include the new user profile so expert agents can use it.
-    if (intentResult.updatedProfile) {
+    if (intentResult.updatedProfile && !skipMemoryUpdate) {
       contextData.userProfile = intentResult.updatedProfile;
+    } else if (skipMemoryUpdate) {
+      intentResult.updatedProfile = {};
     }
 
     if (!intentResult.requiresDeepAnalysis && intentResult.quickReply) {
@@ -157,7 +187,7 @@ ${ragSchema}
 
     // 2. Data Hydration Layer (Yahoo, Longbridge, etc)
     sendProgress("⏳ [阶段 2] 开始上下文 Hydration：接入外部三方数据及实时源...");
-    const hydratedData = await hydrateContext(message, contextData, passedSettings, sendProgress, userId);
+    const hydratedData = await hydrateContext(message, contextData, passedSettings, sendProgress, userId, intentResult.extractedTickers);
     sendProgress("✅ [阶段 2] 上下文 Hydration 注水拼装完成并已传导至下文。");
     
     // SEND PARTIAL RESULT: immediately update the UI with fresh numerical data
@@ -178,7 +208,9 @@ ${ragSchema}
     aggregatedData.contextData = contextData;
 
     sendProgress("⏳ [阶段 3] 移交总控台：开始深度金融领域解析...");
-    const expertAnalysis = await evaluateWealthStatus(userTier, processedMessage, history, aggregatedData, sendProgress, passedSettings, intentResult.targetModules || []);
+    const expertAnalysis = await evaluateWealthStatus(userTier, processedMessage, history, aggregatedData, sendProgress, passedSettings, intentResult.targetModules || [], attachments);
+    
+    if (requestAborted) return;
 
     sendProgress("✅ [阶段 4] 本地推流阻断释放，将 Agent 数据全阵列推送回客户端。");
 

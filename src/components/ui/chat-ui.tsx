@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { messages: any[], isTyping: boolean, onRegenerate?: () => void, onQuickPrompt?: (p: string) => void }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
   const [expandedThinking, setExpandedThinking] = React.useState<Record<number, boolean>>({});
   const [expandedUserMsg, setExpandedUserMsg] = React.useState<Record<number, boolean>>({});
   const [copiedIndex, setCopiedIndex] = React.useState<number | null>(null);
@@ -27,8 +28,8 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
   };
 
   React.useEffect(() => {
-    if (containerRef.current && (isAtBottomRef.current || messages.length <= 1)) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    if (chatEndRef.current && (isAtBottomRef.current || messages.length <= 1)) {
+      chatEndRef.current.scrollIntoView({ behavior: isTyping ? 'auto' : 'smooth', block: 'end' });
     }
   }, [messages, isTyping]);
 
@@ -102,7 +103,7 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
                               <Sparkles className="w-4 h-4 text-dash-gold" />
                             </motion.div>
                           ) : <Check className="w-4 h-4 text-dash-green" />}
-                          <span className="font-sans font-semibold tracking-wide text-sm">{isTyping && i === messages.length - 1 && !msg.content ? '正在思考...' : '思考过程'}</span>
+                          <span className="font-sans font-semibold tracking-wide text-sm">{isTyping && i === messages.length - 1 && !msg.content ? '调度中...' : '运行日志与数据'}</span>
                         </div>
                         <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${expandedThinking[i] !== false ? 'rotate-180' : ''}`} />
                     </button>
@@ -187,18 +188,34 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
                            }
                          }}
                        >{msg.content}</Markdown>
-                       {!isTyping && msg.content && (
-                          <div className="flex items-center gap-2 mt-8 pt-4 border-t border-[#2A2B2D]/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleCopy(msg.content, i)} className="flex items-center gap-1.5 text-[12px] font-medium text-dash-textSub hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1A1D21]">
-                              {copiedIndex === i ? <Check className="w-3.5 h-3.5 text-dash-green" /> : <Copy className="w-3.5 h-3.5" />}
-                              {copiedIndex === i ? <span className="text-dash-green">已复制</span> : '复制'}
-                            </button>
-                            {i === messages.length - 1 && onRegenerate && (
-                              <button onClick={onRegenerate} className="flex items-center gap-1.5 text-[12px] font-medium text-dash-textSub hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1A1D21]">
-                                <RefreshCw className="w-3.5 h-3.5" /> 重新生成
-                              </button>
-                            )}
-                          </div>
+                       {msg.content && (
+                           <div className="mt-8 pt-4 border-t border-[#2A2B2D]/50 flex flex-col gap-3">
+                             {/* Explainable Output Summary */}
+                             <div className="flex flex-wrap gap-2">
+                               {msg._liveSources?.includes('longbridge') && (
+                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                   <Activity className="w-3 h-3" /> Live Data (Longbridge)
+                                 </span>
+                               )}
+                               {msg.hasMemoryUpdate && (
+                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-sans font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                   <UserIcon className="w-3 h-3" /> Profile Memory Updated
+                                 </span>
+                               )}
+                             </div>
+
+                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                               <button onClick={() => handleCopy(msg.content, i)} className="flex items-center gap-1.5 text-[12px] font-medium text-dash-textSub hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1A1D21]">
+                                 {copiedIndex === i ? <Check className="w-3.5 h-3.5 text-dash-green" /> : <Copy className="w-3.5 h-3.5" />}
+                                 {copiedIndex === i ? <span className="text-dash-green">已复制</span> : '复制'}
+                               </button>
+                               {i === messages.length - 1 && onRegenerate && (
+                                 <button onClick={onRegenerate} className="flex items-center gap-1.5 text-[12px] font-medium text-dash-textSub hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1A1D21]">
+                                   <RefreshCw className="w-3.5 h-3.5" /> 重算 (Regenerate)
+                                 </button>
+                               )}
+                             </div>
+                           </div>
                        )}
                     </div>
                  )
@@ -223,6 +240,7 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
           </div>
         ))
       )}
+      <div ref={chatEndRef} className="h-4" />
 
       {/* Fullscreen Code Modal */}
       <AnimatePresence>
