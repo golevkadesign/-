@@ -2,22 +2,66 @@
 @import "tailwindcss";
 
 @theme {
-  --color-dash-bg: #111315; /* Arbitra dark background */
-  --color-dash-card: #181A1C; /* Arbitra card background */
-  --color-dash-cardHover: #1F2124;
-  --color-dash-gold: #32D77D; /* Map our 'gold' usages to the Arbitra Mint Green */
-  --color-dash-green: #32D77D;
-  --color-dash-red: #FA5050; /* Arbitra Red */
-  --color-dash-textMain: #FFFFFF;
-  --color-dash-textSub: #8A8B8F; /* Arbitra mute text */
+  /* Legacy mapping to prevent breaking existing UI */
+  --color-dash-bg: var(--color-dash-base);
+  --color-dash-card: var(--color-dash-surface);
+  --color-dash-cardHover: var(--color-dash-surface-hover);
+  --color-dash-textMain: var(--color-dash-primary);
+  --color-dash-textSub: var(--color-dash-secondary);
 
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'monospace';
+  /* Signature Brand Colors (Premium Terminal) */
+  --color-dash-gold: #D4AF37; /* Refined metallic gold */
+  --color-dash-green: #2EAAA4; /* De-saturated tech green */
+  --color-dash-red: #D34C4C; /* Muted alerts */
+
+  /* Surface Colors - Linear/Vercel style dark aesthetics */
+  --color-dash-base: #0B0C0E;        /* App root background: very dark cool gray */
+  --color-dash-surface: #131417;     /* Standard card/panel background */
+  --color-dash-surface-hover: #1C1E22; /* Hovered surface state */
+
+  /* Borders */
+  --color-dash-subtle: #232529;      /* Dividers, subtle outlines */
+  --color-dash-strong: #363A40;      /* Focused borders, active tabs */
+
+  /* Typography */
+  --color-dash-primary: #EEEEF0;     /* High contrast headings/values */
+  --color-dash-secondary: #93969C;   /* Normal text, labels, secondary info */
+  --color-dash-tertiary: #61646B;    /* Disabled, placeholders, lowest priority */
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* Custom Animations */
+  --animate-shimmer: shimmer 2.5s ease-in-out infinite;
+  --animate-glow-flow: glow-flow 3s ease-in-out infinite alternate;
+  --animate-slide-up: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-fade-in: fadeIn 0.4s ease-out forwards;
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes glow-flow {
+    0% { box-shadow: 0 0 0 1px var(--color-dash-subtle), 0 0 8px 0px rgba(46, 170, 164, 0.05); }
+    100% { box-shadow: 0 0 0 1px var(--color-dash-strong), 0 0 20px 2px rgba(46, 170, 164, 0.15); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 }
 
 body {
-  background-color: var(--color-dash-bg);
-  color: var(--color-dash-textMain);
+  background-color: var(--color-dash-base);
+  color: var(--color-dash-primary);
   font-family: var(--font-sans);
   margin: 0;
   padding: 0;
@@ -34,11 +78,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2A2B2D;
+  background: var(--color-dash-subtle);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3A3B3D;
+  background: var(--color-dash-strong);
 }
 
 .tabular-nums {
@@ -53,7 +97,7 @@ body {
   margin-bottom: 0;
 }
 .ai-message strong, .markdown-body strong {
-  color: var(--color-dash-textMain);
+  color: var(--color-dash-primary);
   font-weight: 600;
 }
 .ai-message ul, .markdown-body ul {
@@ -67,15 +111,17 @@ body {
   margin-bottom: 0.75rem;
 }
 .ai-message h1, .markdown-body h1, .ai-message h2, .markdown-body h2, .ai-message h3, .markdown-body h3 {
-  font-weight: 700;
+  font-weight: 600;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
-  color: var(--color-dash-textMain);
+  color: var(--color-dash-primary);
+  letter-spacing: -0.01em;
 }
 .ai-message h4, .markdown-body h4 {
-  font-weight: 600;
+  font-weight: 500;
   margin-top: 0.75rem;
   margin-bottom: 0.5rem;
+  color: var(--color-dash-primary);
 }
 
 .loading-dots:after {
@@ -84,23 +130,32 @@ body {
 }
 
 @keyframes dots {
-  0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0);}
-  40% { color: white; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0);}
-  60% { text-shadow: .25em 0 0 white, .5em 0 0 rgba(0,0,0,0);}
-  80%, 100% { text-shadow: .25em 0 0 white, .5em 0 0 white;}
+  0%, 20% { color: transparent; text-shadow: .25em 0 0 transparent, .5em 0 0 transparent;}
+  40% { color: var(--color-dash-secondary); text-shadow: .25em 0 0 transparent, .5em 0 0 transparent;}
+  60% { text-shadow: .25em 0 0 var(--color-dash-secondary), .5em 0 0 transparent;}
+  80%, 100% { text-shadow: .25em 0 0 var(--color-dash-secondary), .5em 0 0 var(--color-dash-secondary);}
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: var(--animate-fade-in);
 }
 
-/* Arbitra style panels */
+/* Glass panel styling reflecting the new premium aesthetic */
 .glass-panel {
-  background: var(--color-dash-card);
-  border: 1px solid #2A2B2D;
-  border-radius: 16px;
+  background: var(--color-dash-surface);
+  border: 1px solid var(--color-dash-subtle);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.3);
+}
+
+/* Base utility for shimmer effect */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-dash-surface) 25%,
+    var(--color-dash-surface-hover) 50%,
+    var(--color-dash-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
 }

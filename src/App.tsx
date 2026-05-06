@@ -9,6 +9,7 @@ import { loginWithGoogle, logout, subscribeToAuthChanges, db } from './lib/fireb
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { DeveloperView } from './components/DeveloperView';
+import { Drawer } from './components/Drawer';
 
 
 // Replaced by getUniversalAiClient
@@ -21,7 +22,7 @@ const ANALYSIS_PROMPT = `
 返回严格彻底的分析纯JSON数据（仅包含核心观点和数据）。不要任何人类语言包裹。
 `;
 
-const UI_SUMMARY_PROMPT = `
+export const UI_SUMMARY_PROMPT = `
 你是一个专业的前端 UI 生成引擎与总结文案大师 (Server-Driven UI Builder)。
 你接收底层分析师专家输出的硬核经济策略数据，以及当前的 Terminal State。
 1. 请生成给用户看的【高情商且犀利的文字回复】(不要带json，纯文字即可)。
@@ -54,45 +55,75 @@ const UI_SUMMARY_PROMPT = `
 }
 \`\`\`
 `;
-import { X, Sparkles, Send, LogOut, ChevronDown, Building2, User, FileText, Upload, PieChart, Activity, Loader2, RefreshCw, Cpu, Settings, Bot } from 'lucide-react';
+import { Sparkles, LogOut, ChevronDown, User, Activity, Loader2, RefreshCw, Cpu, Settings, Bot } from 'lucide-react';
 import Markdown from 'react-markdown';
-import { useChat } from '@ai-sdk/react';
-import { ChatList, ChatInput } from './components/ui/chat-ui';
 import { ChartWidget } from './components/ChartWidget';
 
 // Component Registry for Server-Driven UI (SDUI)
 const ComponentRegistry: Record<string, React.FC<any>> = {
   MetricsCard: ({ title, value }) => <Card title={title} value={value} />,
-  EChartsPie: ({ data }) => (
-    <div className="bg-dash-card rounded-xl border border-slate-700/50 p-6 h-[350px] shadow-lg flex flex-col">
-       <div className="flex-1 min-h-0">
-          <ReactECharts option={{ tooltip: { trigger: 'item' }, series: [{ type: 'pie', data, radius: ['40%', '70%'] }] }} />
-       </div>
-    </div>
-  ),
-  Timeline12X: ({ title, nodes }) => (
-    <div className="bg-dash-card rounded-xl border border-slate-700/50 p-6 shadow-lg relative overflow-hidden">
-        <h3 className="text-xl font-bold text-dash-gold mb-6 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-dash-gold" /> {title}
+  EChartsPie: ({ data }) => {
+    if (!data || data.length === 0) {
+      return (
+        <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 h-[350px] shadow-sm flex flex-col items-center justify-center animate-pulse">
+          <div className="w-40 h-40 rounded-full border-8 border-dash-subtle/30 border-t-dash-subtle/60 animate-spin" />
+          <div className="mt-6 h-3 w-24 bg-dash-subtle/50 rounded-full" />
+        </div>
+      );
+    }
+    return (
+      <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 h-[350px] shadow-sm flex flex-col">
+         <div className="flex-1 min-h-0">
+            <ReactECharts option={{ tooltip: { trigger: 'item' }, series: [{ type: 'pie', data, radius: ['40%', '70%'] }] }} />
+         </div>
+      </div>
+    );
+  },
+  Timeline12X: ({ title, nodes }) => {
+    if (!nodes || nodes.length === 0) {
+      return (
+         <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 shadow-sm relative overflow-hidden animate-pulse">
+            <div className="h-6 w-48 bg-dash-subtle/50 rounded-lg mb-8" />
+            <div className="relative border-l border-dash-subtle ml-4 space-y-10 my-4">
+               {[1,2,3].map(i => (
+                 <div key={i} className="pl-8 relative">
+                    <div className="absolute w-4 h-4 bg-dash-subtle rounded-full -left-[8.5px] top-1" />
+                    <div className="h-5 w-20 bg-dash-subtle/50 rounded-md mb-3" />
+                    <div className="h-6 w-1/3 bg-dash-subtle/50 rounded mb-2" />
+                    <div className="h-20 w-full bg-dash-surface rounded-2xl" />
+                 </div>
+               ))}
+            </div>
+         </div>
+      );
+    }
+    return (
+      <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 shadow-sm relative overflow-hidden">
+        <h3 className="text-xl font-bold text-dash-primary mb-6 flex items-center gap-2 tracking-tight">
+            <Sparkles className="w-5 h-5 text-dash-primary" /> {title}
         </h3>
-        <div className="relative border-l-2 border-slate-700 ml-4 space-y-10 my-4">
+        <div className="relative border-l border-dash-subtle ml-4 space-y-10 my-4">
            {nodes?.map((item: any, idx: number) => (
              <div key={idx} className="pl-8 relative">
-                 <div className="absolute w-4 h-4 bg-emerald-500 rounded-full -left-[9px] top-1 ring-4 ring-slate-900 border-2 border-slate-900 shadow-xl" />
-                 <div className="inline-block bg-slate-800 text-emerald-400 font-mono text-xs px-3 py-1 rounded-full mb-3 border border-slate-700/80">
+                 <div className="absolute w-4 h-4 bg-dash-primary rounded-full -left-[8.5px] top-1 ring-4 ring-dash-base shadow-sm" />
+                 <div className="inline-block bg-dash-surface text-dash-primary font-mono font-semibold text-xs px-3 py-1 rounded-md mb-3 border border-dash-subtle">
                    {item.timeNode}
                  </div>
-                 <h4 className="text-lg font-bold text-white mb-2">{item.title}</h4>
-                 <p className="text-sm text-dash-textSub leading-relaxed bg-slate-800/30 p-4 rounded border border-slate-700/30">
+                 <h4 className="text-lg font-bold text-dash-primary mb-2">{item.title}</h4>
+                 <p className="text-sm text-dash-secondary leading-relaxed bg-dash-surface p-4 rounded-2xl border border-dash-subtle">
                    {item.description}
                  </p>
              </div>
            ))}
         </div>
-    </div>
-  ),
+      </div>
+    );
+  },
   SystemAlert: ({ message }) => (
-    <div className="p-4 bg-red-900/40 text-red-400 rounded-lg border border-red-800 my-4">{message}</div>
+    <div className="p-4 bg-dash-red/10 text-dash-red text-sm font-medium rounded-xl border border-dash-red/20 my-4 flex items-center gap-3">
+      <Activity className="w-5 h-5 shrink-0" />
+      {message}
+    </div>
   )
 };
 
@@ -122,552 +153,6 @@ const EMPTY_STATE = {
 
 const formatMoney = (val: number | undefined | null) =>
   val == null ? '-' : `¥${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-
-const fileToBase64 = (file: File): Promise<Attachment> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-       const result = reader.result as string;
-       const [mimeInfo, baseData] = result.split(",");
-       const mimeType = mimeInfo.split(":")[1].split(";")[0];
-       resolve({ mimeType, data: baseData, name: file.name });
-    };
-    reader.onerror = reject;
-  });
-
-const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState, setIsSynthesizing, commitData }: any) => {
-  const [inputMsg, setInputMsg] = useState('');
-  const [syncProfile, setSyncProfile] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [displayMax, setDisplayMax] = useState(10);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const [showDrawerClearConfirm, setShowDrawerClearConfirm] = useState(false);
-  const isChatLoaded = useRef(false);
-  const [isDragging, setIsDragging] = useState(false);
-
-  // UI state for multi-turn dialog
-  const [chatHistory, setChatHistory] = useState<{ user: string, ai: string, attachments: Attachment[], thinking?: string, isThinkingExpanded?: boolean, hasMemoryUpdate?: boolean, _liveSources?: string[] }[]>([]);
-
-  useEffect(() => {
-    const handleClearChat = () => {
-        setChatHistory([]);
-    };
-    window.addEventListener('clear-chat-history', handleClearChat);
-    return () => window.removeEventListener('clear-chat-history', handleClearChat);
-  }, []);
-
-  useEffect(() => {
-     if (user?.uid) {
-        const loadHistory = async () => {
-           try {
-              const snap = await getDoc(doc(db, "userProfiles", user.uid));
-              if (snap.exists() && snap.data().chatHistory) {
-                  setChatHistory(snap.data().chatHistory);
-                  localStorage.setItem(`ai_terminal_chat_${user.uid}`, JSON.stringify(snap.data().chatHistory));
-                  isChatLoaded.current = true;
-                  return;
-              }
-           } catch(e: any) { 
-              if (e.message && e.message.includes('offline')) {
-                 console.log("Offline mode: using local cache for chat history.");
-              } else {
-                 console.error("Failed to load chat history from firestore:", e);
-              }
-           }
-
-           // Fallback to localStorage if not found in Firestore
-           const stored = localStorage.getItem(`ai_terminal_chat_${user.uid}`);
-           let targetStored = stored;
-           
-           if (!stored) {
-              const oldStored = localStorage.getItem('ai_terminal_chat');
-              if (oldStored) {
-                  targetStored = oldStored;
-                  localStorage.setItem(`ai_terminal_chat_${user.uid}`, oldStored);
-                  localStorage.removeItem('ai_terminal_chat');
-              }
-           }
-
-           if (targetStored) {
-              try {
-                const parsed = JSON.parse(targetStored);
-                setChatHistory(parsed.map((item: any) => ({
-                  ...item,
-                  attachments: item.attachments ? item.attachments : (item.img ? [{ mimeType: 'image/jpeg', data: item.img.split(',')[1], name: 'legacy_img.jpg' }] : [])
-                })));
-              } catch { setChatHistory([]); }
-           } else {
-              setChatHistory([]);
-           }
-           isChatLoaded.current = true;
-        };
-        loadHistory();
-     } else {
-        isChatLoaded.current = false;
-        setChatHistory([]);
-     }
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (user?.uid && isChatLoaded.current) {
-       localStorage.setItem(`ai_terminal_chat_${user.uid}`, JSON.stringify(chatHistory));
-       const timeoutId = setTimeout(() => {
-           // Prevent Firestore 1MB document size limit by stripping very large attachments and truncating thinking logs
-           const chatToSync = chatHistory.map(c => {
-               const newC = { ...c };
-               if (newC.thinking) {
-                   newC.thinking = newC.thinking.substring(0, 5000) + (newC.thinking.length > 5000 ? '\n...[truncated]' : '');
-               }
-               newC.attachments = newC.attachments?.map(att => ({
-                    ...att,
-                    // If attachment is larger than 100KB, remove its raw data from persistent storage to save space, keeping just metadata
-                    data: att.data.length > 100000 ? "" : att.data,
-                    isTruncated: att.data.length > 100000
-               })) || [];
-               Object.keys(newC).forEach(key => (newC as any)[key] === undefined && delete (newC as any)[key]);
-               return newC;
-           });
-           setDoc(doc(db, "userProfiles", user.uid), { chatHistory: chatToSync }, { merge: true }).catch(e => console.error("Failed to save chat to firestore:", e));
-       }, 2000);
-       return () => clearTimeout(timeoutId);
-    }
-  }, [chatHistory, user?.uid]);
-  
-  const handlePaste = async (e: React.ClipboardEvent) => {
-    if (e.clipboardData.files && e.clipboardData.files.length > 0) {
-      e.preventDefault();
-      const files = Array.from(e.clipboardData.files);
-      const newAtts = await Promise.all(files.map(file => fileToBase64(file)));
-      setAttachments(prev => [...prev, ...newAtts]);
-    }
-  };
-
-  useEffect(() => {
-    const handleTrigger = (e: any) => {
-      const msg = e.detail;
-      handleAiSubmit(msg);
-    };
-    const handleAddAttachment = (e: any) => {
-      const att = e.detail;
-      setAttachments(prev => [...prev, att]);
-    };
-    window.addEventListener('trigger-ai-drawer', handleTrigger);
-    window.addEventListener('add-attachment', handleAddAttachment);
-    return () => {
-       window.removeEventListener('trigger-ai-drawer', handleTrigger);
-       window.removeEventListener('add-attachment', handleAddAttachment);
-    };
-  }, [chatHistory, attachments, isLoading, data, user]);
-
-  const handleStop = () => {
-      if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
-          abortControllerRef.current = null;
-      }
-      setIsLoading(false);
-  };
-
-  const handleRegenerate = () => {
-      if (isLoading) return;
-      setChatHistory(prev => {
-         const h = [...prev];
-         if (h.length === 0) return h;
-         const last = h.pop();
-         if (last && last.user) {
-             setTimeout(() => handleAiSubmit(last.user, last.attachments), 50);
-         }
-         return h;
-      });
-  };
-
-  const handleAiSubmit = async (overrideMsg?: string, overrideAtts?: Attachment[]) => {
-    const actualMsg = typeof overrideMsg === 'string' ? overrideMsg : inputMsg;
-    const attsToSend = overrideAtts || [...attachments];
-
-    if (!actualMsg.trim() && attsToSend.length === 0) return;
-
-    const userMsg = actualMsg;
-    
-    setChatHistory(prev => [...prev, { user: userMsg, ai: '', attachments: attsToSend }]);
-    if (typeof overrideMsg !== 'string') setInputMsg('');
-    setAttachments([]);
-    setIsLoading(true);
-
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
-
-    try {
-      // 1. Gather Context from BFF
-      const contextRes = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-           message: userMsg,
-           history: chatHistory.map(c => ({ user: c.user, ai: c.ai })),
-           contextData: data,
-           settings: getSettings(),
-           userId: user?.uid,
-           customApiKey: localStorage.getItem('custom_gemini_api_key') || undefined,
-           attachments: attsToSend,
-           skipMemoryUpdate: !syncProfile
-        }),
-        signal
-      });
-
-      if (!contextRes.ok) {
-         const errText = await contextRes.text();
-         throw new Error(`BFF Request Failed (${contextRes.status}): ${errText}`);
-      }
-      
-      let bffData: any = null;
-      let serverError: string | null = null;
-      let thinkingProgress = "";
-      const reader = contextRes.body?.getReader();
-      const decoder = new TextDecoder("utf-8");
-      
-      if (reader) {
-        let buffer = '';
-        while (true) {
-          if (signal.aborted) throw new Error('AbortError');
-          const { done, value } = await reader.read();
-          
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep the last incomplete line in the buffer
-          
-          for (const line of lines) {
-             if (line.startsWith('data: ')) {
-                const dataStr = line.trim().slice(6);
-                if (!dataStr) continue;
-                try {
-                   const parsed = JSON.parse(dataStr);
-                   if (parsed.type === 'progress') {
-                      thinkingProgress += parsed.message + '\n';
-                      if (parsed.message.includes("各节点数据已回流") || parsed.message.includes("CEO 级全局 Synthesizer")) {
-                          setIsSynthesizing?.(true);
-                      }
-                      setChatHistory(prev => {
-                         const newHist = [...prev];
-                         newHist[newHist.length - 1].thinking = thinkingProgress.trim();
-                         if (newHist[newHist.length - 1].isThinkingExpanded === undefined) {
-                            newHist[newHist.length - 1].isThinkingExpanded = false;
-                         }
-                         return newHist;
-                      });
-                   } else if (parsed.type === 'partial_result') {
-                      bffData = { ...bffData, ...parsed.data };
-                      // Eagerly merge Live Portfolio to bypass AI latency and ensure badge
-                      if (parsed.data.externalData?.livePortfolio && parsed.data.externalData.livePortfolio.length > 0) {
-                          commitData((prevData: any) => ({
-                              ...prevData,
-                              distributions: {
-                                  ...prevData.distributions,
-                                  publicHoldings: parsed.data.externalData.livePortfolio
-                              },
-                              _liveSources: ['longbridge']
-                          }));
-                      }
-                      if (parsed.data.updatedProfile && Object.keys(parsed.data.updatedProfile).length > 0) {
-                          setChatHistory(prev => {
-                             const newHist = [...prev];
-                             newHist[newHist.length - 1].hasMemoryUpdate = true;
-                             return newHist;
-                          });
-                      }
-                   } else if (parsed.type === 'result') {
-                      bffData = parsed.data;
-                   } else if (parsed.type === 'error') {
-                      serverError = parsed.error;
-                   }
-                } catch(e) {
-                   console.error("SSE JSON Parse Error for line:", dataStr, e);
-                }
-             }
-          }
-        }
-      }
-
-      if (signal.aborted) throw new Error('AbortError');
-      if (serverError) throw new Error(serverError);
-      if (!bffData) throw new Error("未能从服务器获取核心分析数据。(Timeout or Stream Empty)");
-
-      // 1.5 Handle permanent RAG profile updates
-      if (bffData.updatedProfile && Object.keys(bffData.updatedProfile).length > 0 && syncProfile) {
-          try {
-              if (user?.uid) {
-                  await setDoc(doc(db, "userProfiles", user.uid), { userProfile: bffData.updatedProfile }, { merge: true });
-                  commitData({ ...data, userProfile: bffData.updatedProfile });
-              }
-          } catch(e) {
-              console.error("Failed to commit profile updates:", e);
-          }
-      }
-      
-      // 1.6 Eagerly merge Live Portfolio to bypass AI latency and ensure badge
-      if (bffData.externalData?.livePortfolio && bffData.externalData.livePortfolio.length > 0) {
-          // Merge it early so it renders instantly
-          commitData((prevData: any) => ({
-              ...prevData,
-              distributions: {
-                  ...prevData.distributions,
-                  publicHoldings: bffData.externalData.livePortfolio
-              },
-              _liveSources: ['longbridge']
-          }));
-      }
-
-      // If it's a quick reply, short circuit
-      if (bffData.isQuickReply) {
-         setChatHistory(prev => {
-           const newHist = [...prev];
-           newHist[newHist.length - 1].ai = bffData.expertAnalysis['快速回应'];
-           return newHist;
-         });
-         setIsLoading(false);
-         return;
-      }
-      
-      const analysisText = Object.entries(bffData.expertAnalysis || {})
-         .map(([k, v]) => `[${k}]\n${typeof v === 'string' ? v : JSON.stringify(v)}`)
-         .join('\n\n');
-
-      // 3. Client-side UI Summary Agent
-      const summaryInput = `Tier: ${bffData.userTier}\nUserMsg: ${userMsg}\nHardcore Analysis Result:\n${analysisText}\n\nCurrent Terminal State (SDUI JSON):\n${JSON.stringify(data, null, 2)}`;
-      
-      const ai = getUniversalAiClient();
-      const summaryResponse = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: summaryInput,
-        config: {
-          systemInstruction: UI_SUMMARY_PROMPT,
-          temperature: 0.3
-        }
-      });
-      
-      if (signal.aborted) throw new Error('AbortError');
-      
-      const txt = summaryResponse.text || "";
-      let sduiPayload: any = null;
-      try {
-        let cleanedTxt = txt;
-        const jsonMatch = txt.match(/```(?:json)?\n([\s\S]*?)\n```/);
-        if (jsonMatch && jsonMatch[1]) {
-           cleanedTxt = jsonMatch[1];
-        } else {
-           cleanedTxt = txt.replace(/```(?:json)?\n?/gi, '').replace(/```\n?/g, '').trim();
-        }
-        
-        const startIdx = cleanedTxt.indexOf('{');
-        const endIdx = cleanedTxt.lastIndexOf('}');
-        if (startIdx !== -1 && endIdx !== -1) {
-           sduiPayload = JSON.parse(cleanedTxt.substring(startIdx, endIdx + 1));
-        }
-      } catch(e) { 
-        console.error("Parse SDUI error:", e); 
-      }
-
-      setChatHistory(prev => {
-        const newHist = [...prev];
-        newHist[newHist.length - 1].ai = sduiPayload?.aiReadableReply || `JSON 解析失败: \n${txt}`;
-        return newHist;
-      });
-
-      if (sduiPayload?.sduiSchema) {
-         setSduiState(sduiPayload.sduiSchema);
-      }
-      
-      if (sduiPayload?.updateGlobalState) {
-         commitData((prevData: any) => ({ 
-            ...prevData, 
-            ...sduiPayload.updateGlobalState, 
-            metrics: { ...prevData.metrics, ...(sduiPayload.updateGlobalState.metrics || {}) },
-            distributions: { 
-                ...prevData.distributions, 
-                ...(sduiPayload.updateGlobalState.distributions || {}),
-                // Ensure AI doesn't accidentally overwrite deterministic live portfolio
-                ...(bffData.externalData?.livePortfolio ? { publicHoldings: bffData.externalData.livePortfolio } : {})
-            },
-            insights: { ...prevData.insights, ...(sduiPayload.updateGlobalState.insights || {}) },
-            goal: sduiPayload.updateGlobalState.goal || prevData.goal,
-            _liveSources: bffData.externalData?.livePortfolio ? ['longbridge'] : []
-         }));
-      }
-
-    } catch (error: any) {
-      if (error.message === 'AbortError' || error.name === 'AbortError') {
-          console.log('AI Generation Stopped.');
-          return;
-      }
-      setChatHistory(prev => {
-        const newHist = [...prev];
-        let errMsg = error.message;
-        if (errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE')) {
-           errMsg = "API 当前负载较高 (503 Service Unavailable)。需求激增通常是暂时的，请您稍后重试。";
-        } else if (errMsg.includes('API key not valid') || errMsg.includes('API_KEY_INVALID')) {
-           errMsg = "获取到的 API Key 无效。请点击环境的 Settings -> Secrets 面板，检查并清除或同步更新您自定义的 API_KEY。";
-        } else if (errMsg.includes('exceeded your current quota') || errMsg.includes('rate limits') || errMsg.includes('Quota exceeded') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('monthly spending cap')) {
-           errMsg = "API 额度已耗尽 (Resource Exhausted - Quota Exceeded)。您配置的 API Key 免费额度/速率或可用资金余额已达上限，请检查计费层级或更换 Key 后重试。";
-        } else if (errMsg.includes('{')) {
-            try {
-                const parsed = JSON.parse(errMsg.substring(errMsg.indexOf('{')));
-                if (parsed.error?.message) errMsg = parsed.error.message;
-            } catch {}
-        }
-        newHist[newHist.length - 1].ai = `⚠️ **通信中断**: ${errMsg}`;
-        return newHist;
-      });
-    } finally {
-      setIsLoading(false);
-      setIsSynthesizing?.(false);
-      abortControllerRef.current = null;
-    }
-  };
-
-  return (
-    <div 
-      className={`fixed inset-y-0 right-0 w-full sm:w-[500px] md:w-[600px] bg-dash-bg border-l border-[#2A2B2D] z-50 transform transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] shadow-2xl flex flex-col ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-      onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-      onDrop={async (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          const files = Array.from(e.dataTransfer.files);
-          const newAtts = await Promise.all(files.map(file => fileToBase64(file)));
-          setAttachments(prev => [...prev, ...newAtts]);
-        }
-      }}
-    >
-      {isDragging && (
-        <div className="absolute inset-0 z-[100] bg-dash-gold/10 backdrop-blur-sm border-2 border-dashed border-dash-gold flex items-center justify-center">
-           <div className="bg-[#111315] p-6 rounded-2xl shadow-2xl flex flex-col items-center pointer-events-none">
-              <Upload className="w-10 h-10 mb-4 text-dash-gold animate-bounce" />
-              <p className="text-white font-semibold text-lg">释放即可上传文件 (Drop to Upload)</p>
-           </div>
-        </div>
-      )}
-      
-      <div className="p-4 sm:p-6 border-b border-[#2A2B2D] flex justify-between items-center bg-dash-card relative z-10">
-        <div className="flex items-center gap-3">
-           <div className="w-10 h-10 rounded-xl bg-[#111315] flex items-center justify-center border border-[#2A2B2D]">
-              <div className="w-4 h-4 rounded-full bg-dash-green"></div>
-           </div>
-           <div>
-              <h2 className="text-lg font-semibold text-white leading-tight">Smart Agent</h2>
-              <p className="text-[10px] text-dash-textSub font-mono uppercase tracking-widest mt-0.5">Terminal AI</p>
-           </div>
-        </div>
-        <div className="flex items-center gap-2">
-           {chatHistory.length > 0 && (
-              <div className="relative">
-                 <button 
-                   onClick={() => setShowDrawerClearConfirm(true)} 
-                   className="text-[11px] text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 hover:border-rose-500/50 hover:bg-rose-500/10 transition-all flex items-center gap-1.5 font-medium"
-                 >
-                   <RefreshCw className="w-3.5 h-3.5" /> 清除屏显
-                 </button>
-                 
-                 {showDrawerClearConfirm && (
-                   <>
-                     <div className="fixed inset-0 z-40" onClick={() => setShowDrawerClearConfirm(false)}></div>
-                     <div className="absolute right-0 top-full mt-2 w-64 bg-[#111315] border border-rose-500/30 rounded-xl p-4 shadow-xl z-50 animate-in fade-in slide-in-from-top-2">
-                        <p className="text-xs text-dash-textMain mb-3 leading-relaxed">此操作仅清除屏幕显示，系统仍保有长期记忆。确认清除？</p>
-                        <div className="flex justify-end gap-2">
-                           <button onClick={() => setShowDrawerClearConfirm(false)} className="px-3 py-1.5 bg-white/5 border border-white/10 text-dash-textSub text-xs rounded hover:bg-white/10 hover:text-white transition-colors">取消</button>
-                           <button onClick={() => { setChatHistory([]); setShowDrawerClearConfirm(false); }} className="px-3 py-1.5 bg-rose-600/20 text-rose-500 border border-rose-500/30 text-xs rounded hover:bg-rose-600 hover:text-white transition-colors">确认清除</button>
-                        </div>
-                     </div>
-                   </>
-                 )}
-              </div>
-           )}
-           <button onClick={() => setIsDrawerOpen(false)} className="p-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg transition-colors text-dash-textSub hover:text-white ml-2 shadow-sm">
-             <X className="w-5 h-5" />
-           </button>
-        </div>
-      </div>
-
-      <ChatList 
-        messages={chatHistory.flatMap((c, i) => {
-           const msgs = [];
-           if (c.user || (c.attachments && c.attachments.length > 0)) {
-              msgs.push({ role: 'user', content: c.user || '', attachments: c.attachments });
-           }
-           if (c.ai || (i === chatHistory.length - 1 && isLoading) || c.thinking) {
-              msgs.push({ role: 'assistant', content: c.ai || '', thinking: c.thinking, hasMemoryUpdate: c.hasMemoryUpdate, _liveSources: data._liveSources });
-           }
-           return msgs;
-        })} 
-        isTyping={isLoading} 
-        onRegenerate={chatHistory.length > 0 ? handleRegenerate : undefined}
-        onQuickPrompt={(prompt: string) => handleAiSubmit(prompt)}
-      />
-
-      <div className="absolute bottom-0 left-0 right-0 z-40 pb-0 w-full border-t border-white/5 bg-[#0B0D0F]/70 backdrop-saturate-[180%] backdrop-blur-[20px]">
-        <div className="mx-auto flex flex-col p-4 sm:p-6 pb-8 sm:pb-6 relative transition-all ease-[cubic-bezier(0.4,0,0.2,1)] duration-300">
-            {attachments.length > 0 && (
-               <div className="flex flex-wrap gap-2 mb-3">
-                 {attachments.map((att, i) => (
-                    <div key={i} className="relative group animate-in zoom-in duration-200">
-                      {att.mimeType.startsWith('image/') ? (
-                         <img src={`data:${att.mimeType};base64,${att.data}`} alt="upload" className="w-16 h-16 object-cover rounded-2xl border border-white/10 shadow-lg" />
-                      ) : (
-                         <div className="w-16 h-16 bg-[#1A1D21] rounded-2xl border border-white/10 flex flex-col items-center justify-center p-1 text-[10px] text-dash-textSub font-sans shadow-lg">
-                            <FileText className="w-6 h-6 mb-1 text-dash-textSub" />
-                            <span className="truncate w-full text-center px-1 font-medium">{att.name}</span>
-                         </div>
-                      )}
-                      <button onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 opacity-100 hover:scale-110 transition-transform shadow-md">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                 ))}
-               </div>
-            )}
-
-            <div className="flex items-end gap-2 w-full relative">
-               <button onClick={() => fileInputRef.current?.click()} className="flex-shrink-0 w-11 h-11 sm:w-12 sm:h-12 bg-transparent rounded-2xl border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all shadow-sm flex items-center justify-center mb-1 active:scale-95">
-                 <Upload className="w-5 h-5 sm:w-6 sm:h-6" />
-               </button>
-               <input type="file" multiple accept="image/*,.pdf,.txt" ref={fileInputRef} onChange={async e => {
-                 if (e.target.files) {
-                   const files = Array.from(e.target.files);
-                   const newAtts = await Promise.all(files.map(file => fileToBase64(file)));
-                   setAttachments(prev => [...prev, ...newAtts]);
-                   if (fileInputRef.current) fileInputRef.current.value = '';
-                 }
-               }} className="hidden" />
-
-               <div className="flex-1 w-full relative">
-                 <ChatInput 
-                   input={inputMsg} 
-                   handleInputChange={(e: any) => setInputMsg(e.target.value)} 
-                   handleSubmit={(e: any) => {
-                      e?.preventDefault();
-                      handleAiSubmit();
-                   }} 
-                   isLoading={isLoading} 
-                   onStop={handleStop}
-                   onPaste={handlePaste}
-                   hasAttachments={attachments.length > 0}
-                 />
-                 <div className="absolute top-[-30px] right-2 flex items-center gap-2">
-                   <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer hover:text-slate-200 transition-colors bg-[#1A1D21] px-2 py-1 rounded border border-white/5">
-                     <input type="checkbox" className="rounded bg-slate-800 border-slate-600 outline-none w-3 h-3 text-dash-green focus:ring-0 focus:ring-offset-0" checked={syncProfile} onChange={(e) => setSyncProfile(e.target.checked)} />
-                     <span>写入长线记忆</span>
-                   </label>
-                 </div>
-               </div>
-            </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -877,7 +362,7 @@ export default function App() {
   const goalPercent = Math.min((data.goal?.index || 0) * 100, 100);
 
   if (loadingAuth) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#0f172a] text-dash-gold">Initializing Security Context...</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-dash-bg text-dash-primary font-mono tracking-widest text-[13px] uppercase font-semibold">Initializing Security Context...</div>;
   }
 
   if (!user) {
@@ -886,23 +371,23 @@ export default function App() {
          <motion.div 
            initial={{ opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
-           transition={{ duration: 0.8, ease: "easeOut" }}
-           className="glass-panel p-8 sm:p-12 border border-[#2A2B2D] max-w-md w-full text-center"
+           transition={{ type: "spring", stiffness: 400, damping: 25 }}
+           className="bg-dash-surface border border-dash-subtle rounded-[32px] p-8 sm:p-12 max-w-md w-full text-center shadow-lg backdrop-blur-xl"
          >
-            <div className="bg-[#181A1C] w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 sm:mb-8 border border-[#2A2B2D]">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-dash-green" />
+            <div className="bg-dash-base w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-dash-subtle shadow-inner">
+              <div className="w-10 h-10 rounded-full bg-dash-primary shadow-[0_0_20px_rgba(255,255,255,0.4)]" />
             </div>
             
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-3">Arbitra <span className="font-normal text-dash-textSub">Terminal</span></h1>
-            <p className="text-dash-textSub mb-8 text-sm leading-relaxed">Secure data sync. Authenticate to access.</p>
+            <h1 className="text-3xl sm:text-4xl font-sans tracking-tight font-medium text-dash-primary mb-3">Arbitra <span className="text-dash-tertiary">Terminal</span></h1>
+            <p className="text-dash-secondary mb-10 text-[11px] leading-relaxed uppercase tracking-widest font-semibold">Secure Authentication Required</p>
             
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={loginWithGoogle}
-              className="w-full py-4 px-6 bg-white text-slate-900 rounded-xl font-bold flex items-center justify-center gap-3 shadow-lg transition-all"
+              className="w-full py-4 px-6 bg-dash-primary text-dash-base rounded-[20px] font-bold flex items-center justify-center gap-3 transition-colors hover:bg-white border border-transparent shadow-sm"
             >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 bg-white rounded-full p-0.5" />
               Continue with Google
             </motion.button>
          </motion.div>
@@ -1027,63 +512,64 @@ export default function App() {
 
       {/* Top Header */}
 
-      <header className="sticky top-0 z-40 bg-dash-bg border-b border-[#2A2B2D] mb-6 md:mb-8 transition-all">
+      <header className="sticky top-0 z-40 bg-dash-bg/80 backdrop-blur-xl border-b border-dash-subtle mb-6 md:mb-8 transition-all">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 md:h-20 flex justify-between items-center">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-[#181A1C] p-1.5 sm:p-2 rounded-lg border border-[#2A2B2D]">
-              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-dash-green"></div>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="bg-dash-surface border border-dash-subtle shadow-inner w-10 h-10 sm:w-12 sm:h-12 rounded-[14px] flex items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-dash-primary/20 to-transparent opacity-20"></div>
+              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-dash-primary shadow-[0_0_10px_rgba(255,255,255,0.3)]"></div>
             </div>
-            <div className="truncate flex items-center">
-              <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-white mb-0">
-                <span className="font-normal text-dash-textMain mr-1 hidden sm:inline">Arbitra</span> 
-                Terminal
+            <div className="truncate flex flex-col justify-center">
+              <h1 className="text-xl sm:text-2xl font-sans font-medium tracking-tight text-dash-primary leading-none">
+                Arbitra <span className="text-dash-tertiary">Terminal</span>
               </h1>
             </div>
           </div>
           
-          <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
+          <div className="flex items-center gap-3 sm:gap-4 lg:gap-6">
             <button
               onClick={() => setShowDeveloperView(true)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all font-mono text-[11px] sm:text-xs"
+              className="flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-dash-surface border border-dash-subtle text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover transition-colors font-mono text-[10px] sm:text-xs uppercase tracking-widest font-semibold shadow-sm"
               title="开发者视图 / Developer View"
             >
-              <Cpu className="w-4 h-4" />
-              <span className="hidden sm:inline font-semibold">开发者</span>
+              <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Developer</span>
             </button>
 
             <motion.button 
-              whileHover={{ scale: 1.05 }}
-
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setIsDrawerOpen(true)} 
-              className="hidden md:flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium bg-dash-green text-slate-900 hover:bg-[#3be589] transition-all"
+              className="hidden md:flex items-center gap-2 px-6 py-2.5 rounded-[12px] text-[13px] font-bold bg-dash-primary text-dash-base hover:bg-white transition-colors shadow-sm"
             >
-              <Activity className="w-4 h-4" /> New action
+              <Sparkles className="w-4 h-4" /> Initialize
             </motion.button>
 
             {/* Mobile simplified AI button */}
             <motion.button 
-              whileTap={{ scale: 0.90 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setIsDrawerOpen(true)} 
-              className="flex md:hidden items-center justify-center w-9 h-9 rounded-full bg-dash-green text-slate-900 hover:bg-[#3be589] transition-all"
+              className="flex md:hidden items-center justify-center w-10 h-10 rounded-[12px] bg-dash-primary text-dash-base hover:bg-white transition-colors shadow-sm"
             >
-              <Activity className="w-5 h-5" />
+              <Sparkles className="w-5 h-5" />
             </motion.button>
 
-            <div className="h-6 md:h-8 w-px bg-white/10"></div>
+            <div className="h-6 md:h-8 w-px bg-dash-subtle mx-1"></div>
 
             <div className="flex items-center gap-3 group relative cursor-pointer">
-               <img src={user.photoURL} alt="Profile" className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-transparent hover:border-dash-green transition-colors object-cover" />
-               <div className="absolute right-0 top-10 md:top-12 scale-0 group-hover:scale-100 origin-top-right transition-all duration-200 bg-dash-card border border-[#2A2B2D] rounded-xl p-2 shadow-2xl z-50 w-48 sm:w-56">
-                  <div className="px-3 py-2 border-b border-white/5 mb-2">
-                    <p className="text-sm font-bold text-white truncate">{user.displayName}</p>
-                    <p className="text-xs text-dash-textSub truncate">{user.email}</p>
+               <div className="w-10 h-10 rounded-[12px] bg-dash-surface-hover border border-dash-subtle hover:border-dash-primary/30 flex items-center justify-center overflow-hidden shrink-0 transition-colors shadow-sm">
+                 <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+               </div>
+               <div className="absolute right-0 top-12 scale-0 group-hover:scale-100 origin-top-right transition-all duration-200 bg-dash-surface border border-dash-subtle rounded-2xl p-2 shadow-xl z-50 w-56 backdrop-blur-xl">
+                  <div className="px-3 py-3 border-b border-dash-subtle mb-2">
+                    <p className="text-[13px] font-bold text-dash-primary truncate">{user.displayName}</p>
+                    <p className="text-[11px] font-mono tracking-wide text-dash-tertiary truncate">{user.email}</p>
                   </div>
-                  <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-2 text-dash-textSub hover:bg-white/5 p-2.5 rounded-lg text-sm font-medium transition-colors mb-1">
-                    <Settings className="w-4 h-4" /> 设置中心 (Settings)
+                  <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-2 text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover p-2.5 rounded-xl text-xs font-semibold transition-colors mb-1 uppercase tracking-wide">
+                    <Settings className="w-4 h-4" /> Settings
                   </button>
-                  <button onClick={logout} className="w-full flex items-center gap-2 text-dash-textSub hover:bg-white/5 p-2.5 rounded-lg text-sm font-medium transition-colors">
-                    <LogOut className="w-4 h-4" /> 退出登录 (LogOut)
+                  <button onClick={logout} className="w-full flex items-center gap-2 text-dash-textSub hover:bg-dash-red/10 text-dash-secondary hover:text-dash-red p-2.5 rounded-xl text-xs font-semibold transition-colors uppercase tracking-wide">
+                    <LogOut className="w-4 h-4" /> Disconnect
                   </button>
                </div>
             </div>
@@ -1096,13 +582,13 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="glass-panel p-6 sm:p-8 relative overflow-hidden group mt-6 mb-6 md:mb-10"
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 relative overflow-hidden group mt-6 mb-6 md:mb-10 shadow-sm transition-colors hover:bg-dash-surface-hover"
         >
-          <h2 className="relative z-10 flex items-center gap-2 text-dash-textSub text-sm font-medium mb-3 tracking-wide">
-             <Activity className="w-4 h-4 text-dash-green"/> 战略概览 (Strategic Overview)
+          <h2 className="relative z-10 flex items-center gap-2 text-dash-tertiary text-[11px] font-semibold uppercase tracking-[0.15em] mb-4">
+             <Activity className="w-4 h-4 text-dash-primary"/> Strategic Overview
           </h2>
-          <p className="relative z-10 text-white text-base sm:text-xl font-medium tracking-tight">
+          <p className="relative z-10 text-dash-primary text-[15px] sm:text-xl font-medium tracking-tight leading-relaxed">
              {data.insights?.global || "Waiting for deep financial sync..."}
           </p>
         </motion.div>
@@ -1132,16 +618,16 @@ export default function App() {
 
       {/* 新增: 用户画像 (User Persona) */}
       {(data.userPersona?.description && !data.userPersona.description.includes("当前信息不足以")) && (
-      <div className="glass-panel p-6 md:p-8 mb-8">
-        <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2 tracking-tight">
-          <User className="w-5 h-5 text-dash-textSub" /> 核心画像模型与诊断
+      <div className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 md:p-8 mb-8 shadow-sm">
+        <h3 className="text-lg font-bold text-dash-primary mb-4 flex items-center gap-2 tracking-tight">
+          <User className="w-5 h-5 text-dash-secondary" /> User Persona
         </h3>
-        <p className="text-dash-textSub text-sm leading-relaxed mb-5">
-          {data.userPersona?.description || "当前信息不足以建立高精度画像..."}
+        <p className="text-dash-secondary text-[13px] leading-relaxed mb-6 font-medium">
+          {data.userPersona?.description || "Insufficient data for detailed persona..."}
         </p>
         <div className="flex flex-wrap gap-2">
           {(data.userPersona?.tags || []).map((tag: string, idx: number) => (
-             <span key={idx} className="bg-[#111315] text-dash-textMain px-3 py-1.5 rounded-full text-xs font-medium border border-[#2A2B2D]">
+             <span key={idx} className="bg-dash-surface-hover text-dash-primary px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-wider font-semibold border border-dash-subtle">
                {tag}
              </span>
           ))}
@@ -1229,17 +715,17 @@ export default function App() {
           >
             <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto custom-scroll pr-2">
               {data.distributions?.fixedAssets?.map((asset: any, idx: number) => (
-                 <div key={idx} className="bg-dash-bg border border-[#2A2B2D] rounded-xl p-5 sm:p-6 shrink-0">
-                    <div className="font-semibold text-white mb-4 text-sm sm:text-base flex justify-between items-start">
+                 <div key={idx} className="bg-dash-surface-hover border border-dash-subtle rounded-3xl p-5 sm:p-6 shrink-0 shadow-sm">
+                    <div className="font-semibold text-dash-primary mb-4 text-sm sm:text-[15px] flex justify-between items-start tracking-tight">
                       {asset.name}
                     </div>
-                    <div className="flex justify-between items-center text-xs sm:text-sm mb-2">
-                       <span className="text-slate-400 font-mono">预估价值</span>
-                       <span className="text-white font-mono font-medium">¥{(asset.marketValue ?? asset.value ?? 0).toLocaleString()}</span>
+                    <div className="flex justify-between items-center text-[13px] mb-3">
+                       <span className="text-dash-secondary font-mono tracking-wide">Estimated Value</span>
+                       <span className="text-dash-primary font-mono font-bold tracking-tight">¥{(asset.marketValue ?? asset.value ?? 0).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between items-center text-xs sm:text-sm mb-3">
-                       <span className="text-slate-400 font-mono">结余成本/负债</span>
-                       <span className="text-rose-400 font-mono font-medium">¥{(asset.holdingCost ?? 0).toLocaleString()}</span>
+                    <div className="flex justify-between items-center text-[13px] mb-2">
+                       <span className="text-dash-secondary font-mono tracking-wide">Debt / Cost</span>
+                       <span className="text-dash-red font-mono font-bold tracking-tight">¥{(asset.holdingCost ?? 0).toLocaleString()}</span>
                     </div>
                  </div>
               ))}
@@ -1264,49 +750,54 @@ export default function App() {
       {/* 阶段性人生策略建议 (Life Strategies Timeline) */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">
          {/* 短线 */}
-         <div className="glass-panel p-5 sm:p-6 md:p-8 relative overflow-hidden group">
-           <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
-             短期战略 <span className="text-dash-textSub text-sm font-normal">(12 Months)</span>
+         <motion.div 
+           initial={{ opacity: 0, y: 10 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ type: "spring", stiffness: 400, damping: 25, staggerChildren: 0.1 }}
+           className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 relative overflow-hidden group shadow-sm transition-colors hover:bg-dash-surface-hover"
+         >
+           <h3 className="text-[11px] font-semibold text-dash-secondary mb-8 flex items-center gap-2 uppercase tracking-[0.1em] block w-full">
+             Short-Term Strategy <span className="text-dash-tertiary ml-auto">12 Months</span>
            </h3>
            {(!data.lifeStrategiesShort || data.lifeStrategiesShort.length === 0) ? (
-              <div className="text-dash-textSub text-xs sm:text-sm flex items-center justify-center h-24 border border-[#2A2B2D] rounded-xl bg-transparent font-mono">暂无数据</div>
+              <div className="text-dash-tertiary text-[11px] flex items-center justify-center h-24 border border-dash-subtle rounded-2xl bg-dash-surface-hover font-semibold uppercase tracking-widest">No Data</div>
            ) : (
-              <div className="relative border-l border-[#2A2B2D] ml-4 space-y-10 my-4">
+              <div className="relative border-l border-dash-subtle ml-4 space-y-12 my-4">
                 {data.lifeStrategiesShort.map((item: any, idx: number) => {
                    const contentStr = encodeURIComponent(item.description || item.title || '');
                    const contentHash = btoa(contentStr).slice(0, 15);
                    const planKey = `short-${idx}-${contentHash}`;
                    const plan = nodePlans[planKey];
                    return (
-                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }} key={idx} className="pl-6 sm:pl-8 relative group/item">
-                      <div className="absolute w-2.5 h-2.5 bg-dash-green rounded-full -left-[5px] top-2" />
-                      <div className="inline-block bg-[#111315] text-dash-textSub font-mono text-[10px] sm:text-xs px-2 sm:px-3 py-1 rounded-md mb-2 sm:mb-3 border border-[#2A2B2D]">
+                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ type: "spring", stiffness: 400, damping: 25, delay: idx * 0.1 }} key={idx} className="pl-6 sm:pl-8 relative group/item">
+                      <div className="absolute w-3 h-3 bg-dash-primary rounded-full -left-[6.5px] top-2 ring-4 ring-dash-base shadow-sm" />
+                      <div className="inline-block bg-dash-surface-hover text-dash-primary font-mono text-[10px] sm:text-xs px-3 py-1.5 rounded-lg mb-3 tracking-wide border border-dash-subtle tabular-nums font-semibold">
                         {item.timeNode}
                       </div>
-                      <div className="flex justify-between items-start mb-2 sm:mb-3">
-                         <h4 className="text-base sm:text-lg font-semibold text-white mb-0 pr-4">{item.title}</h4>
+                      <div className="flex justify-between items-start mb-3 gap-2">
+                         <h4 className="text-[15px] sm:text-lg font-semibold text-dash-primary leading-tight tracking-tight pr-0">{item.title}</h4>
                          <button 
                            onClick={() => plan?.status === 'thinking' ? null : handleInlineNodePlan('短线策略', item, false, idx)}
                            disabled={plan?.status === 'thinking'}
-                           className="shrink-0 text-[10px] sm:text-xs font-mono font-medium bg-[#111315] border border-[#2A2B2D] hover:border-dash-green text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                           className="shrink-0 text-[10px] uppercase font-semibold border border-dash-subtle hover:border-dash-primary bg-dash-surface-hover hover:bg-white text-dash-primary hover:text-dash-base px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed tracking-widest shadow-sm"
                          >
-                           {plan?.status === 'thinking' ? <Loader2 className="w-3 h-3 animate-spin"/> : (plan?.status === 'done' ? <RefreshCw className="w-3 h-3" /> : <Activity className="w-3 h-3"/> )}
-                           {plan?.status === 'thinking' ? '推演中...' : (plan?.status === 'done' ? '重新推演' : '深度推演')}
+                           {plan?.status === 'thinking' ? <Loader2 className="w-3 h-3 animate-spin" /> : (plan?.status === 'done' ? <RefreshCw className="w-3 h-3" /> : <Activity className="w-3 h-3"/> )}
+                           {plan?.status === 'thinking' ? 'Wait' : (plan?.status === 'done' ? 'Retry' : 'Analyze')}
                          </button>
                       </div>
-                      <p className="text-sm text-dash-textSub leading-relaxed">
+                      <p className="text-[13px] text-dash-secondary leading-relaxed p-4 rounded-2xl border border-dash-subtle bg-dash-surface-hover">
                         {item.description}
                       </p>
                       {plan && (
-                         <div className="mt-4 bg-[#111315] border border-[#2A2B2D] rounded-xl overflow-hidden text-xs sm:text-sm">
+                         <div className="mt-4 bg-dash-base border border-dash-subtle rounded-2xl overflow-hidden text-xs sm:text-sm shadow-inner">
                             {plan.status === 'thinking' && (
-                               <div className="flex items-center gap-2 px-3 py-2 text-dash-green font-mono text-[10px] sm:text-xs border-b border-[#2A2B2D]">
-                                  <Cpu className="w-3 h-3 animate-pulse flex-shrink-0" />
-                                  <span className="truncate opacity-90">{plan.thinking || 'Connecting...'}</span>
+                               <div className="flex items-center gap-2 px-4 py-3 text-dash-primary font-semibold tracking-wide text-[10px] sm:text-xs border-b border-dash-subtle bg-dash-surface-hover">
+                                  <Cpu className="w-3.5 h-3.5 animate-pulse shrink-0" />
+                                  <span className="truncate">{plan.thinking || 'Connecting...'}</span>
                                </div>
                             )}
                             {plan.result && (
-                               <div className="p-4 sm:p-5 text-dash-textMain markdown-body">
+                               <div className="p-4 sm:p-5 text-dash-primary markdown-body leading-relaxed text-[13px]">
                                   <Markdown>{plan.result}</Markdown>
                                </div>
                             )}
@@ -1316,52 +807,57 @@ export default function App() {
                 )})}
               </div>
            )}
-         </div>
+         </motion.div>
 
          {/* 长线 */}
-         <div className="glass-panel p-5 sm:p-6 md:p-8 relative overflow-hidden group">
-           <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
-             长期战略 <span className="text-dash-textSub text-sm font-normal">(10+ Years)</span>
+         <motion.div 
+           initial={{ opacity: 0, y: 10 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ type: "spring", stiffness: 400, damping: 25, staggerChildren: 0.1, delay: 0.2 }}
+           className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 relative overflow-hidden group shadow-sm transition-colors hover:bg-dash-surface-hover"
+         >
+           <h3 className="text-[11px] font-semibold text-dash-secondary mb-8 flex items-center gap-2 uppercase tracking-[0.1em] block w-full">
+             Long-Term Strategy <span className="text-dash-tertiary ml-auto">10+ Years</span>
            </h3>
            {(!data.lifeStrategiesLong || data.lifeStrategiesLong.length === 0) ? (
-              <div className="text-dash-textSub text-xs sm:text-sm flex items-center justify-center h-24 border border-[#2A2B2D] rounded-xl bg-transparent font-mono">暂无数据</div>
+              <div className="text-dash-tertiary text-[11px] flex items-center justify-center h-24 border border-dash-subtle rounded-2xl bg-dash-surface-hover font-semibold uppercase tracking-widest">No Data</div>
            ) : (
-              <div className="relative border-l border-[#2A2B2D] ml-4 space-y-10 my-4">
+              <div className="relative border-l border-dash-subtle ml-4 space-y-12 my-4">
                 {data.lifeStrategiesLong.map((item: any, idx: number) => {
                    const contentStr = encodeURIComponent(item.description || item.title || '');
                    const contentHash = btoa(contentStr).slice(0, 15);
                    const planKey = `long-${idx}-${contentHash}`;
                    const plan = nodePlans[planKey];
                    return (
-                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }} key={idx} className="pl-6 sm:pl-8 relative group/item">
-                      <div className="absolute w-2.5 h-2.5 bg-dash-green rounded-full -left-[5px] top-2" />
-                      <div className="inline-block bg-[#111315] text-dash-textSub font-mono text-[10px] sm:text-xs px-2 sm:px-3 py-1 rounded-md mb-2 sm:mb-3 border border-[#2A2B2D]">
+                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ type: "spring", stiffness: 400, damping: 25, delay: idx * 0.1 }} key={idx} className="pl-6 sm:pl-8 relative group/item">
+                      <div className="absolute w-3 h-3 bg-dash-primary rounded-full -left-[6.5px] top-2 ring-4 ring-dash-base shadow-sm" />
+                      <div className="inline-block bg-dash-surface-hover text-dash-primary font-mono text-[10px] sm:text-xs px-3 py-1.5 rounded-lg mb-3 tracking-wide border border-dash-subtle tabular-nums font-semibold">
                         {item.timeNode}
                       </div>
-                      <div className="flex justify-between items-start mb-2 sm:mb-3">
-                         <h4 className="text-base sm:text-lg font-semibold text-white mb-0 pr-4">{item.title}</h4>
+                      <div className="flex justify-between items-start mb-3 gap-2">
+                         <h4 className="text-[15px] sm:text-lg font-semibold text-dash-primary leading-tight tracking-tight pr-0">{item.title}</h4>
                          <button 
                            onClick={() => plan?.status === 'thinking' ? null : handleInlineNodePlan('长线策略', item, true, idx)}
                            disabled={plan?.status === 'thinking'}
-                           className="shrink-0 text-[10px] sm:text-xs font-mono font-medium bg-[#111315] border border-[#2A2B2D] hover:border-dash-green text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                           className="shrink-0 text-[10px] uppercase font-semibold border border-dash-subtle hover:border-dash-primary bg-dash-surface-hover hover:bg-white text-dash-primary hover:text-dash-base px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed tracking-widest shadow-sm"
                          >
-                           {plan?.status === 'thinking' ? <Loader2 className="w-3 h-3 animate-spin"/> : (plan?.status === 'done' ? <RefreshCw className="w-3 h-3" /> : <Activity className="w-3 h-3"/> )}
-                           {plan?.status === 'thinking' ? '推演中...' : (plan?.status === 'done' ? '重新推演' : '深度推演')}
+                           {plan?.status === 'thinking' ? <Loader2 className="w-3 h-3 animate-spin" /> : (plan?.status === 'done' ? <RefreshCw className="w-3 h-3" /> : <Activity className="w-3 h-3"/> )}
+                           {plan?.status === 'thinking' ? 'Wait' : (plan?.status === 'done' ? 'Retry' : 'Analyze')}
                          </button>
                       </div>
-                      <p className="text-sm text-dash-textSub leading-relaxed">
+                      <p className="text-[13px] text-dash-secondary leading-relaxed p-4 rounded-2xl border border-dash-subtle bg-dash-surface-hover">
                         {item.description}
                       </p>
                       {plan && (
-                         <div className="mt-4 bg-[#111315] border border-[#2A2B2D] rounded-xl overflow-hidden text-xs sm:text-sm">
+                         <div className="mt-4 bg-dash-base border border-dash-subtle rounded-2xl overflow-hidden text-xs sm:text-sm shadow-inner">
                             {plan.status === 'thinking' && (
-                               <div className="flex items-center gap-2 px-3 py-2 text-dash-green font-mono text-[10px] sm:text-xs border-b border-[#2A2B2D]">
-                                  <Cpu className="w-3 h-3 animate-pulse flex-shrink-0" />
-                                  <span className="truncate opacity-90">{plan.thinking || '连接中...'}</span>
+                               <div className="flex items-center gap-2 px-4 py-3 text-dash-primary font-semibold tracking-wide text-[10px] sm:text-xs border-b border-dash-subtle bg-dash-surface-hover">
+                                  <Cpu className="w-3.5 h-3.5 animate-pulse shrink-0" />
+                                  <span className="truncate">{plan.thinking || 'Connecting...'}</span>
                                </div>
                             )}
                             {plan.result && (
-                               <div className="p-4 sm:p-5 text-dash-textMain markdown-body">
+                               <div className="p-4 sm:p-5 text-dash-primary markdown-body leading-relaxed text-[13px]">
                                   <Markdown>{plan.result}</Markdown>
                                </div>
                             )}
@@ -1371,7 +867,7 @@ export default function App() {
                 )})}
               </div>
            )}
-         </div>
+         </motion.div>
       </div>
 
       {/* 底部目标追踪卡片 (Goal Tracker) */}
@@ -1379,25 +875,25 @@ export default function App() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="glass-panel p-6 sm:p-8 relative overflow-hidden group mb-10"
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 relative overflow-hidden group mb-10 shadow-sm transition-colors hover:bg-dash-surface-hover"
       >
         <div className="relative z-10 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 sm:gap-8 mb-6 sm:mb-8">
           <div className="flex-1">
-            <h3 className="text-xl sm:text-2xl font-semibold text-white break-words">{data.goal?.name || "战略目标"}</h3>
-            <p className="text-xs sm:text-sm text-dash-textSub mt-2 font-mono break-all sm:break-normal">
-              当前进度: <span className="text-white">¥{data.goal?.current?.toLocaleString() || 0}</span> / ¥{data.goal?.target?.toLocaleString() || 0}
+            <h3 className="text-xl sm:text-2xl font-sans tracking-tight font-medium text-dash-primary break-words">{data.goal?.name || "战略目标"}</h3>
+            <p className="text-[13px] text-dash-tertiary mt-2 font-mono break-all sm:break-normal font-medium tracking-wide">
+              PROGRESS TARGET <span className="text-dash-secondary ml-2 font-semibold">¥{(data.goal?.current || 0).toLocaleString()} <span className="text-dash-subtle mx-1">/</span> ¥{(data.goal?.target || 0).toLocaleString()}</span>
             </p>
           </div>
           <div className="text-left sm:text-right">
-            <div className="text-[10px] sm:text-xs text-dash-textSub uppercase mb-1 tracking-widest">达成指数</div>
-            <div className={`text-4xl sm:text-5xl font-bold tabular-nums tracking-tighter ${data.goal?.index >= 1 ? 'text-dash-green' : 'text-white'}`}>
-              {data.goal?.index?.toFixed(2) || "0.00"}
+            <div className="text-[10px] text-dash-tertiary uppercase mb-2 tracking-widest font-semibold font-sans">Achievement Index</div>
+            <div className={`text-4xl sm:text-5xl font-mono tabular-nums tracking-tighter ${data.goal?.index >= 1 ? 'text-dash-green' : 'text-dash-primary'}`}>
+              {(data.goal?.index || 0).toFixed(4)}
             </div>
           </div>
         </div>
-        <div className="w-full h-4 sm:h-5 bg-[#111315] rounded-full relative overflow-hidden border border-[#2A2B2D]">
-          <div className={`h-full relative z-10 transition-all duration-1000 ${data.goal?.index >= 1 ? 'bg-dash-green' : 'bg-dash-green opacity-80'}`} style={{ width: `${goalPercent}%` }}>
+        <div className="relative z-10 w-full h-3 sm:h-4 bg-dash-surface border border-dash-subtle rounded-full overflow-hidden shadow-inner">
+          <div className={`h-full relative z-10 transition-all duration-1000 ${data.goal?.index >= 1 ? 'bg-dash-green' : 'bg-dash-primary'}`} style={{ width: `${goalPercent}%` }}>
           </div>
         </div>
       </motion.div>
@@ -1406,27 +902,29 @@ export default function App() {
 
       {/* Confirm Clear Modal */}
       {showClearConfirm && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex justify-center items-center p-4">
-          <div className="bg-slate-900 border border-rose-500/30 shadow-[0_0_40px_rgba(244,63,94,0.15)] rounded-2xl w-full max-w-md overflow-hidden relative p-6">
-            <h3 className="text-xl font-bold text-rose-500 mb-2">🚨 高危操作警告</h3>
-            <p className="text-dash-textSub mb-6 text-sm leading-relaxed">
-              此操作将彻底抹除当前账户的所有AI推演进度与资产切片记录，无法恢复。是否继续？
+        <div className="fixed inset-0 bg-dash-bg/80 backdrop-blur-xl z-50 flex justify-center items-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-dash-surface border border-dash-red/30 shadow-lg rounded-[24px] w-full max-w-md overflow-hidden relative p-8">
+            <h3 className="text-[15px] font-bold text-dash-red mb-3 uppercase tracking-widest flex items-center gap-2">
+               Reset Workspace
+            </h3>
+            <p className="text-dash-secondary mb-8 text-[13px] leading-relaxed font-medium">
+              This action will permanently erase all AI analysis history and workspace artifacts for the current user. This action cannot be undone. Do you wish to proceed?
             </p>
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <button 
                 onClick={() => setShowClearConfirm(false)}
-                className="flex-1 px-4 py-2.5 bg-slate-800 text-dash-textMain rounded-lg font-medium hover:bg-slate-700 transition"
+                className="flex-1 px-4 py-3 bg-dash-surface text-dash-primary border border-dash-subtle rounded-xl text-[13px] font-semibold hover:bg-dash-surface-hover transition-colors uppercase tracking-widest shadow-sm"
               >
-                取消
+                Cancel
               </button>
               <button 
                 onClick={confirmClearData}
-                className="flex-1 px-4 py-2.5 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-500 transition shadow-[0_0_15px_rgba(244,63,94,0.3)]"
+                className="flex-1 px-4 py-3 bg-dash-red text-white border border-dash-red/50 rounded-xl text-[13px] font-bold hover:bg-red-500 transition-colors shadow-sm uppercase tracking-widest"
               >
-                确认清空
+                Confirm
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
