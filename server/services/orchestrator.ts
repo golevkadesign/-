@@ -3,32 +3,54 @@ import { getUniversalAiClient } from "../../src/lib/ai-universal";
 import { DEFAULT_PROMPTS } from "../../src/lib/defaultPrompts";
 
 // 使用免费、极速的 Flash 模型做第一层意图拦截与提取
-export async function analyzeIntentWithFlash(message: string, history: any[], settings?: any) {
-  const prompt = `你是一个高效的意图识别与前置处理路由大脑。
-分析用户的输入，判断是否需要调用后台极度耗时的重度理财分析矩阵（各路专家Agent联动）。
+export async function analyzeIntentWithFlash(message: string, history: any[], settings?: any, userTier: string = "General", userProfile: any = {}, ragSchema: string = "", attachments: any[] = []) {
+  const prompt = `You are the RAG Memory Agent and Gateway for a top-tier AI Financial Advisor system.
 
-【用户输入】
+【User Tier】
+${userTier}
+
+【User Input】
 ${message}
 
-【历史对话】
+【History】
 ${JSON.stringify(history.slice(-3))}
 
-任务说明：
-1. requiresDeepAnalysis (boolean): 如果用户的输入只是简单的打招呼、闲聊、或只需要你一两句话就能回答的常识问题，请设为 false。如果涉及到他的资产、负债、股票、人生规划、重大决策等需要深度分析的内容，设为 true。
-2. quickReply (string): 如果 requiresDeepAnalysis 为 false，请直接在这里给出回复（简短得体，带有一点金融私人管家的调性）。如果为 true，可为空。
-3. summarizedIntent (string): 如果为 true，提取这段话中最核心的理财诉求（比如“询问特斯拉前景”，“寻求债务重组方案”），供后台分析师直接使用。
-4. extractedTickers (string array): 提取用户提到的所有股票/加密货币/期权的简写代码（例如 TSLA, AAPL, BTC-USD，如果不清楚请猜测雅虎财经支持的代码，只包含代码）。
-5. targetModules (string array): 明确用户意图中需要调动哪几个专家引擎来更新或补充大盘对应板块的数据结论。如果用户仅是补充修改某一项，则只包含受影响的引擎。必须从以下列表中严格选择（可多选）：
-   ["Debt Focus", "High Net Worth", "General Finance", "Market Analysis", "Devil Advocate"]
-   如果不明确，可全选当前层级所需的主引擎组合。只选受新消息影响需要真正重新分析的模块，以免浪费算力。
+【User Profile】
+${JSON.stringify(userProfile, null, 2)}
 
-请严格输出 JSON 格式。`;
+Task:
+1. requiresDeepAnalysis (boolean): Determine if this message requires full multi-agent deep analysis. Simple greetings, thank yous, daily pleasantries, or non-financial chatting should NOT trigger deep analysis.
+2. quickReply (string): If it DOES NOT need deep analysis, provide a friendly quick reply (less than 60 words).
+3. summarizedIntent (string): If it DOES need deep analysis, summarize the core financial question/intent into a clean instruction for the expert agents.
+4. extractedTickers (string array): Extract ALL stock/crypto/option ticker symbols mentioned (e.g., TSLA, AAPL, BTC-USD). Guess Yahoo Finance supported symbols if unclear.
+5. targetModules (string array): Which expert engines are needed? From: ["Debt Focus", "High Net Worth", "General Finance", "Market Analysis", "Devil Advocate"].
+6. updatedProfile (object): Update the user's permanent profile based on ANY new information in the message.
+   - Using the following definition schema:
+   ${ragSchema}
+   - RETURN the FULL, structurally sound updated profile (incorporating both new info and preserving the old info).
+
+Respond MUST strictly be JSON matching this structure:
+{
+  "requiresDeepAnalysis": boolean,
+  "summary": "...",
+  "quickReply": "...",
+  "extractedTickers": ["TSLA", "AAPL"],
+  "targetModules": ["Market Analysis", ...],
+  "updatedProfile": { ... }
+}`;
 
   try {
     const ai = getUniversalAiClient(settings);
+    let parts: any[] = [{ text: prompt }];
+    if (attachments && attachments.length > 0) {
+       attachments.forEach((att: any) => {
+          if (att.data) parts.push({ inlineData: { data: att.data, mimeType: att.mimeType } });
+       });
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: prompt,
+      contents: [{ role: "user", parts }],
       config: { 
         temperature: 0.1,
         responseMimeType: "application/json",
@@ -41,9 +63,10 @@ ${JSON.stringify(history.slice(-3))}
     return {
       requiresDeepAnalysis: output.requiresDeepAnalysis ?? true,
       quickReply: output.quickReply || "",
-      summarizedIntent: output.summarizedIntent || message,
+      summary: output.summarizedIntent || output.summary || message,
       extractedTickers: output.extractedTickers || [],
-      targetModules: output.targetModules || []
+      targetModules: output.targetModules || [],
+      updatedProfile: output.updatedProfile || userProfile
     };
   } catch (e: any) {
     console.error("Flash Intent Analysis Error:", e);
@@ -52,7 +75,7 @@ ${JSON.stringify(history.slice(-3))}
       throw e;
     }
     // Fallback to heavy analysis if JSON parsing fails
-    return { requiresDeepAnalysis: true, quickReply: "", summarizedIntent: message, extractedTickers: [], targetModules: [] };
+    return { requiresDeepAnalysis: true, quickReply: "", summary: message, extractedTickers: [], targetModules: [], updatedProfile: userProfile };
   }
 }
 

@@ -14,14 +14,6 @@ import { Drawer } from './components/Drawer';
 
 // Replaced by getUniversalAiClient
 
-const ANALYSIS_PROMPT = `
-你是一个顶级 AI 私人财富总监 (Backend-Only Analysis Expert)。
-你的任务是深层测算，但不负责最终的排版和UI结构。
-你接收多模态内容和第三方系统（如Yahoo牌价、券商API等）及各路顶尖Agent的深度诊断数据。\n严正声明：你会收到各领域Agent通过联网获取到的对某个实体资产/负债（如当地真实房价、按揭利率）的客观市调估值数据，提取关键结论时必须百分百采用这些真实市场市调数据进行财务测算推演，禁止自己凭空捏造数值。
-请全面分析当前的净资产、流动性、抗风险以及给定Tier层次的最佳破局点策略。
-返回严格彻底的分析纯JSON数据（仅包含核心观点和数据）。不要任何人类语言包裹。
-`;
-
 export const UI_SUMMARY_PROMPT = `
 你是一个专业的前端 UI 生成引擎与总结文案大师 (Server-Driven UI Builder)。
 你接收底层分析师专家输出的硬核经济策略数据，以及当前的 Terminal State。
@@ -61,7 +53,13 @@ import { ChartWidget } from './components/ChartWidget';
 
 // Component Registry for Server-Driven UI (SDUI)
 const ComponentRegistry: Record<string, React.FC<any>> = {
-  MetricsCard: ({ title, value }) => <Card title={title} value={value} />,
+  MetricsCard: ({ title, value }) => <Card title={title} value={
+    typeof value === 'string' && value.includes('¥') ? (
+      <span className="tabular-nums">{value}</span>
+    ) : (
+      <span className="tabular-nums">{typeof value === 'number' ? `¥${value.toLocaleString()}` : value}</span>
+    )
+  } />,
   EChartsPie: ({ data }) => {
     if (!data || data.length === 0) {
       return (
@@ -239,11 +237,11 @@ export default function App() {
     const arr = data.distributions?.liquidity || [];
     return {
       tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-      legend: { orient: 'vertical', left: 'left', textStyle: { color: '#94a3b8' }, top: 'middle' },
+      legend: { orient: 'vertical', left: 'left', textStyle: { color: 'var(--color-dash-secondary)' }, top: 'middle' },
       color: ['#14b8a6', '#0ea5e9', '#3b82f6', '#0284c7', '#0369a1'],
       series: [{
         type: 'pie', radius: ['50%', '70%'], center: ['70%', '50%'],
-        itemStyle: { borderRadius: 6, borderColor: '#0B0D0F', borderWidth: 2 },
+        itemStyle: { borderRadius: 6, borderColor: 'var(--color-dash-base)', borderWidth: 2 },
         label: { show: false }, data: arr.length ? arr : [{ name: '无数据', value: 0 }]
       }]
     };
@@ -253,11 +251,11 @@ export default function App() {
     const arr = data.distributions?.expenses || [];
     return {
       tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-      legend: { orient: 'vertical', left: 'left', textStyle: { color: '#94a3b8' }, top: 'middle' },
+      legend: { orient: 'vertical', left: 'left', textStyle: { color: 'var(--color-dash-secondary)' }, top: 'middle' },
       color: ['#0d9488', '#0891b2', '#2563eb', '#1e40af', '#115e59', '#1e3a8a'],
       series: [{
         type: 'pie', radius: ['50%', '70%'], center: ['70%', '50%'],
-        itemStyle: { borderRadius: 6, borderColor: '#0B0D0F', borderWidth: 2 },
+        itemStyle: { borderRadius: 6, borderColor: 'var(--color-dash-base)', borderWidth: 2 },
         label: { show: false }, data: arr.length ? arr : [{ name: '无数据', value: 0 }]
       }]
     };
@@ -275,13 +273,13 @@ export default function App() {
     return {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[1].name + ' : ¥' + (p[1].value?.toLocaleString() || 0) },
       grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
-      xAxis: { type: 'category', splitLine: { show: false }, data: names.length > 1 ? names : ['无数据'], axisLabel: { color: '#94a3b8', interval: 0, formatter: (val: string) => val.length > 4 ? val.slice(0, 4) + '...' : val } },
-      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1A1D21', type: 'dashed' } }, axisLabel: { show: false } },
+      xAxis: { type: 'category', splitLine: { show: false }, data: names.length > 1 ? names : ['无数据'], axisLabel: { color: 'var(--color-dash-secondary)', interval: 0, formatter: (val: string) => val.length > 4 ? val.slice(0, 4) + '...' : val } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: 'var(--color-dash-subtle)', type: 'dashed' } }, axisLabel: { show: false } },
       series: [
         { type: 'bar', stack: 'Total', itemStyle: { borderColor: 'transparent', color: 'transparent' }, data: helpData },
         {
-          type: 'bar', stack: 'Total', label: { show: true, position: 'top', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: '#FFFFFF', fontSize: 10 },
-          itemStyle: { color: (p: any) => p.dataIndex === names.length - 1 ? '#FFFFFF' : '#0ea5e9', borderRadius: [4, 4, 0, 0] }, data: mainData.length ? mainData : [0]
+          type: 'bar', stack: 'Total', label: { show: true, position: 'top', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: 'var(--color-dash-primary)', fontSize: 10 },
+          itemStyle: { color: (p: any) => p.dataIndex === names.length - 1 ? 'var(--color-dash-primary)' : '#0ea5e9', borderRadius: [4, 4, 0, 0] }, data: mainData.length ? mainData : [0]
         }
       ]
     };
@@ -312,13 +310,13 @@ export default function App() {
           width: 12,
           right: 0,
           borderColor: 'transparent',
-          backgroundColor: '#1E293B',
+          backgroundColor: 'var(--color-dash-surface-hover)',
           fillerColor: '#38BDF855',
           handleSize: '100%',
         }
       ],
-      xAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#1A1D21', type: 'dashed' } }, axisLabel: { show: false } }],
-      yAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#94a3b8', interval: 0, width: 80, overflow: 'truncate' } }],
+      xAxis: [{ type: 'value', splitLine: { lineStyle: { color: 'var(--color-dash-subtle)', type: 'dashed' } }, axisLabel: { show: false } }],
+      yAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: 'var(--color-dash-secondary)', interval: 0, width: 80, overflow: 'truncate' } }],
       series: [{ 
         type: 'bar', 
         label: { show: true, position: 'right', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: '#14b8a6', fontSize: 10 }, 
@@ -348,13 +346,13 @@ export default function App() {
           height: 12,
           bottom: 0,
           borderColor: 'transparent',
-          backgroundColor: '#1E293B',
+          backgroundColor: 'var(--color-dash-surface-hover)',
           fillerColor: '#38BDF855',
           handleSize: '100%',
         }
       ],
-      xAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#94a3b8', interval: 0, rotate: symbols.length > 4 ? 30 : 0 } }],
-      yAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#1A1D21', type: 'dashed' } }, axisLabel: { show: false } }],
+      xAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: 'var(--color-dash-secondary)', interval: 0, rotate: symbols.length > 4 ? 30 : 0 } }],
+      yAxis: [{ type: 'value', splitLine: { lineStyle: { color: 'var(--color-dash-subtle)', type: 'dashed' } }, axisLabel: { show: false } }],
       series: [{ type: 'bar', label: { show: true, position: 'top', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: '#0369a1', fontSize: 10 }, barWidth: '40%', data: values.length ? values : [0], itemStyle: { color: '#0369a1', borderRadius: [4, 4, 0, 0] } }]
     };
   }, [data.distributions?.options]);

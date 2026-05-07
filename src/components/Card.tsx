@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 
 interface CardProps {
   title: string;
-  value?: string | number;
+  value?: React.ReactNode;
   subValue?: string;
   trendGood?: boolean;
   isLongSubText?: boolean;

@@ -79,91 +79,30 @@ chatRouter.post("/", async (req, res) => {
     else if (netWorth > 10000000) userTier = "High Net Worth Individual";
     else if (netWorth > 1000000) userTier = "Emerging Wealth";
 
-    // 1. Intent Recognition and Summarization using lightweight model (gemini-3.1-flash)
-    console.log("[Intent] Assessing message intent using Flash...");
-    sendProgress("⏳ [阶段 1] 侧翼调度：启动高速闪电意图网络及 RAG 记忆...");
-    const ragSchema = passedSettings?.ragSchema || DEFAULT_RAG_SCHEMA;
-    const intentPrompt = `
-You are the RAG Memory Agent and Gateway for a top-tier AI Financial Advisor system.
-User Tier: ${userTier}
-User's message: "${message}"
+      // 1. Intent Recognition and Summarization using lightweight model (gemini-3.1-flash)
+      console.log("[Intent] Assessing message intent using Flash...");
+      sendProgress("⏳ [阶段 1] 侧翼调度：启动高速闪电意图网络及 RAG 记忆...");
+      const ragSchema = passedSettings?.ragSchema || DEFAULT_RAG_SCHEMA;
 
-User's current permanent profile (JSON):
-${JSON.stringify(userProfile, null, 2)}
-
-Task:
-1. Determine if this message requires full multi-agent deep analysis. Simple greetings, thank yous, daily pleasantries, or non-financial chatting should NOT trigger deep analysis.
-2. If it DOES NOT need deep analysis, provide a friendly quick reply (less than 60 words).
-3. If it DOES need deep analysis, summarize the core financial question/intent into a clean instruction for the expert agents.
-4. targetModules (string array): 明确需要调动哪几个专家引擎来更新或补充旧的大盘数据。如果用户仅是补充修改某一项，则只包含受影响的引擎。必须从以下列表中严格选择（可多选）：["Debt Focus", "High Net Worth", "General Finance", "Market Analysis", "Devil Advocate"]。如果不明确，可全选。只选受新消息影响需要重新分析的模块，以免浪费算力。
-5. IMPORTANT: Update the user's permanent profile based on ANY new information in the message (career, financial status, personal goals, dependants, risk tolerance, etc). 
-   - Keep the structure extensible. Use the base fixed logical buckets defined in the schema (financial, career, personal, preferences, etc).
-   - DYNAMIC EXTENSION: If you discover new dimensions, specific unique assets, or personal scenarios that don't fit the base categories, you are ENCOURAGED to dynamically create new top-level keys and nested structures.
-   - If there is qualitative info that doesn't fit a stat, add it to an \`insights\` array inside the relevant category.
-   - Return the FULL, structurally sound updated profile including base fields and newly dynamically extended fields.
-
-Respond strictly in JSON matching this structure:
-{
-  "requiresDeepAnalysis": boolean,
-  "summary": "...",
-  "quickReply": "...",
-  "targetModules": ["..."],
-  "updatedProfile": {
-     // FILL IN ACCORDING TO THIS MARKDOWN SCHEMA:
-     /* 
-${ragSchema} 
-     */
-  }
-}
-`;
-
-    let intentResult = { requiresDeepAnalysis: true, summary: message, quickReply: "", updatedProfile: userProfile, targetModules: [], extractedTickers: [] };
-    
-    let intentParts: any[] = [{ text: intentPrompt }];
-    if (attachments && attachments.length > 0) {
-       attachments.forEach((att: any) => {
-          if (att.data) intentParts.push({ inlineData: { data: att.data, mimeType: att.mimeType } });
-       });
-    }
-
-    try {
-      let timeoutId: any;
-      const timeoutPromise = new Promise<any>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Agent AI Timeout (Intent Analysis)')), 15000);
-      });
-      const response = await Promise.race([
-        ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: [{ role: "user", parts: intentParts }],
-          config: {
-            temperature: 0.1,
-          }
-        }),
-        timeoutPromise
-      ]).finally(() => clearTimeout(timeoutId));
+      let intentResult = { requiresDeepAnalysis: true, summary: message, quickReply: "", updatedProfile: userProfile, targetModules: [] as string[], extractedTickers: [] as string[] };
       
-      if (response.text) {
-        let text = response.text.replace(/```(?:json)?\n?/gi, '').replace(/```\n?/g, '').trim();
-        if (text.startsWith('{')) {
-          intentResult = JSON.parse(text);
-        } else {
-          throw new Error("Invalid format from intent model");
-        }
+      try {
+        const { analyzeIntentWithFlash } = await import("../services/orchestrator");
+        intentResult = await analyzeIntentWithFlash(message, history, passedSettings, userTier, userProfile, ragSchema, attachments);
         sendProgress(`✅ [阶段 1] 意图网络分析完成。`);
         if (intentResult.targetModules?.length > 0) sendProgress(`🔍 [锁定分析模块]: ${intentResult.targetModules.join(', ')}`);
         if (intentResult.extractedTickers?.length > 0) sendProgress(`📦 [提取到标的资产]: ${intentResult.extractedTickers.join(', ')}`);
+      } catch (e: any) {
+        console.error("[Intent] parsing failed", e);
+        const isFatal = e.message?.includes('API_KEY_INVALID') || e.message?.includes('API key not valid') || e.message?.includes('exceeded your current quota') || e.message?.includes('Quota exceeded') || e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED') || e.message?.includes('monthly spending cap');
+        
+        if (isFatal) {
+           sendProgress(`❌ [阶段 1] 意图网络判定异常：API 额度或鉴权失败 (${e.message}...)，系统将阻断后续调用以保护系统。`);
+           throw e;
+        } else {
+           sendProgress(`❌ [阶段 1] 降级：意图网络判定异常 (${e.message}...)，结构解析失败，自动 fallback 至全局满载分析。`);
+        }
       }
-    } catch (e: any) {
-      console.error("[Intent] parsing failed", e);
-      const isFatal = e.message?.includes('API_KEY_INVALID') || e.message?.includes('API key not valid') || e.message?.includes('exceeded your current quota') || e.message?.includes('Quota exceeded') || e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED') || e.message?.includes('monthly spending cap');
-      
-      if (isFatal) {
-         sendProgress(`❌ [阶段 1] 意图网络判定异常：API 额度或鉴权失败 (${e.message}...)，系统将阻断后续调用以保护系统。`);
-         throw e;
-      } else {
-         sendProgress(`❌ [阶段 1] 降级：意图网络判定异常 (${e.message}...)，结构解析失败，自动 fallback 至全局满载分析。`);
-      }
-    }
     
     // We update the aggregated data to include the new user profile so expert agents can use it.
     if (intentResult.updatedProfile && !skipMemoryUpdate) {
