@@ -278,7 +278,7 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
       const summaryInput = `Tier: ${bffData.userTier}\nUserMsg: ${userMsg}\nHardcore Analysis Result:\n${analysisText}\n\nCurrent Terminal State (SDUI JSON):\n${JSON.stringify(data, null, 2)}`;
       
       const ai = getUniversalAiClient();
-      const summaryResponse = await ai.models.generateContent({
+      const responseStream = await ai.models.generateContentStream({
         model: "gemini-3-flash-preview",
         contents: summaryInput,
         config: {
@@ -287,9 +287,24 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
         }
       });
       
-      if (signal.aborted) throw new Error('AbortError');
-      
-      const txt = summaryResponse.text || "";
+      let txt = "";
+      for await (const chunk of responseStream) {
+        if (signal.aborted) throw new Error('AbortError');
+        txt += chunk.text;
+        
+        let displayText = txt;
+        const jsonMatch = txt.indexOf('```json');
+        if (jsonMatch !== -1) {
+            displayText = txt.substring(0, jsonMatch).trim();
+        }
+
+        setChatHistory(prev => {
+           const newHist = [...prev];
+           newHist[newHist.length - 1].ai = displayText;
+           return newHist;
+        });
+      }
+
       let sduiPayload: any = null;
       try {
         let cleanedTxt = txt;
@@ -311,7 +326,8 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
 
       setChatHistory(prev => {
         const newHist = [...prev];
-        newHist[newHist.length - 1].ai = sduiPayload?.aiReadableReply || `JSON 解析失败: \n${txt}`;
+        const displayAi = txt.substring(0, txt.indexOf('```json') !== -1 ? txt.indexOf('```json') : txt.length).trim();
+        newHist[newHist.length - 1].ai = displayAi || (sduiPayload ? "SDUI 状态已更新" : `JSON 解析失败: \n${txt}`);
         return newHist;
       });
 

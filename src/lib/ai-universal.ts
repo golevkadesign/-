@@ -78,7 +78,7 @@ async function fetchOpenAI(apiKey: string, model: string, messages: any[], tempe
 export const getUniversalAiClient = (passedSettings?: any) => {
   const getS = () => passedSettings || getSettings();
 
-  const retryOperation = async (operation: () => Promise<any>, maxRetries = 3, baseDelay = 1000) => {
+  const retryOperation = async (operation: () => Promise<any>, maxRetries = 5, baseDelay = 2000) => {
     let attempt = 0;
     while (true) {
       try {
@@ -89,13 +89,13 @@ export const getUniversalAiClient = (passedSettings?: any) => {
         const errMessage = error?.message || String(error);
         const errStatus = error?.status || error?.code || (error?.response?.status);
         const errJsonString = JSON.stringify(error) || '';
-        const isTransient = errMessage.includes('503') || errMessage.includes('UNAVAILABLE') || errMessage.includes('fetch failed') || errMessage.includes('ECONNRESET') || errMessage.includes('HeadersTimeoutError') || errMessage.includes('overloaded') || errMessage.includes('temporarily down') || errStatus === 503 || errStatus === 'UNAVAILABLE' || errJsonString.includes('503') || errJsonString.includes('UNAVAILABLE');
+        const isTransient = errMessage.includes('503') || errMessage.includes('UNAVAILABLE') || errMessage.includes('fetch failed') || errMessage.includes('ECONNRESET') || errMessage.includes('HeadersTimeoutError') || errMessage.includes('overloaded') || errMessage.includes('temporarily down') || errStatus === 503 || errStatus === 'UNAVAILABLE' || errJsonString.includes('503') || errJsonString.includes('UNAVAILABLE') || errStatus === 500 || errMessage.includes('500');
         
         if (!isTransient || attempt >= maxRetries) {
           throw error;
         }
         
-        const delay = baseDelay * Math.pow(1.5, attempt - 1);
+        const delay = baseDelay * Math.pow(2, attempt - 1);
         console.log(`[AI Retry] Transient error encountered, retrying (${attempt}/${maxRetries}) in ${delay}ms...`, errMessage);
         await new Promise(res => setTimeout(res, delay));
       }
