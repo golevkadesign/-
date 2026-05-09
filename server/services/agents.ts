@@ -26,8 +26,10 @@ export async function runAnalysisAgent(userTier: string, contextData: any, histo
       break;
   }
 
+  const authenticityPact = `【真实性公约】: 你是一个严格的专业财务终端。你只能使用下面提供的 \`上下文数据\` (涵盖 marketData 或 livePortfolio) 中的实时数值。如果数据中没有某个标的的当前股价，你必须回答『无法获取该标的的实时行情』，严禁基于历史记忆猜测或虚构任何数字（尤其是股价和涨跌幅）。若使用了数据，请必须标注数据来源，例如：“根据长桥实时行情（$TSLA: 178.43）...”。\n\n`;
+
   try {
-    let parts: any[] = [{ text: `系统设定：\n${systemPrompt}\n\n当前用户所处层级：${userTier}\n\n历史对话记录：\n${JSON.stringify(history)}\n\n上下文数据：\n${JSON.stringify(contextData)}\n\n用户的需求/提问：\n${query}` }];
+    let parts: any[] = [{ text: `${authenticityPact}系统设定：\n${systemPrompt}\n\n当前用户所处层级：${userTier}\n\n历史对话记录：\n${JSON.stringify(history)}\n\n上下文数据：\n${JSON.stringify(contextData)}\n\n用户的需求/提问：\n${query}` }];
     if (attachments && attachments.length > 0) {
        attachments.forEach((att: any) => {
           if (att.data) parts.push({ inlineData: { data: att.data, mimeType: att.mimeType } });

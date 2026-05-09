@@ -186,13 +186,53 @@ export async function streamSynthesis(userTier: string, message: string, externa
     }
   }
 
+  const authenticityPact = `【真实性公约】: 你是一个严格的专业财务终端。你必须优先使用下方 \`[实时市场行情 (MARKET_DATA)]\` 中的最新价格进行推演！如果某标的在 \`MARKET_DATA\` 中缺失，再参考 \`[LIVE_PORTFOLIO]\` 中附带的实时价格或市值/数量。严禁虚构任何数字。使用最新数据时请标注来源（如：“根据实时行情及持仓计算（$TSLA: 178.43）...”）。\n\n`;
+
   const template = settings?.agentPrompts?.orchestrator || DEFAULT_PROMPTS.orchestrator;
-  const summaryPrompt = template
+
+  const uiSummaryInstructions = `
+========================================
+【前端渲染与状态更新契约 (CRITICAL)】
+你的任务分为两步，必须严格按顺序输出：
+第一步：先输出给用户看的【高情商且犀利的文字回复】(不要带json，使用 markdown 排版)。作为主理人，你需要把专家们提供的核心数据进行综合提炼，给出具体的实操建议。
+第二步：在回答的所有文字结束后，最后输出一个包含 JSON 数据的代码块，用于底层系统的前端渲染 SDUI JSON Schema 更新补丁（Patch）。
+
+核心规则：
+- 除必须格式外，所有UI标题（如图表标题）使用中文。
+- metrics 中包含 netWorthSummary, liquiditySummary, safetyRatioSummary, fcfSummary 四个字段。
+- 重要：**增量更新（Differential Update）**。前端会将你的 \`updateGlobalState\` 输出与当前的 Terminal State 进行合并。对于完全没有变化的板块，**请直接省略该字段**，不要输出空数组/空字符串来覆盖原有的有效数据！！比如：如果你本次不涉及 fixedAssets 更新，则 updateGlobalState 里面绝对不可出现 fixedAssets 字段。
+- 只做数据的更新，绝不重置旧的有效资产结构。
+
+当前前端面板状态 (TERMINAL_STATE)：
+${JSON.stringify({ 
+    metrics: externalData?.contextData?.metrics || {},
+    distributions: externalData?.contextData?.distributions || {},
+    lifeStrategiesShort: externalData?.contextData?.lifeStrategiesShort || [],
+    lifeStrategiesLong: externalData?.contextData?.lifeStrategiesLong || []
+}, null, 2)}
+
+注意！你的末尾 JSON Patch 必须符合以下严格结构示例：
+\`\`\`json
+{
+  "sduiSchema": [],
+  "updateGlobalState": {
+    "metrics": { "netWorth": 1000000, "netWorthSummary": "总结短句..." },
+    "distributions": { "liquidity": [{"name": "现金", "value": 100}] },
+    "lifeStrategiesShort": [ { "timeNode": "2024", "title": "节点1", "description": "描述" } ],
+    "insights": { "publicSummary": "..." }
+  }
+}
+\`\`\`
+`;
+
+  const summaryPrompt = authenticityPact + template
     .replace('{userTier}', () => userTier)
     .replace('{message}', () => message)
     .replace('{userProfileRAG}', () => JSON.stringify(externalData?.contextData?.userProfile || {}, null, 2))
     .replace('{livePortfolioRAG}', () => JSON.stringify(externalData?.livePortfolio || externalData?.contextData?.distributions?.publicHoldings || [], null, 2))
-    .replace('{agentResults}', () => JSON.stringify(dehydratedResults, null, 2));
+    .replace('{marketDataRAG}', () => JSON.stringify(externalData?.marketData || {}, null, 2))
+    .replace('{agentResults}', () => JSON.stringify(dehydratedResults, null, 2))
+    + "\n" + uiSummaryInstructions;
 
   try {
     const responseStream = await ai.models.generateContentStream({
@@ -204,11 +244,16 @@ export async function streamSynthesis(userTier: string, message: string, externa
   } catch (e: any) {
     console.error("Synthesizer pro model error, falling back to flash:", e);
     if (onProgress) onProgress(`⚠️ [阶段 3.9] Pro模型高负载，降级至Flash模型进行全局汇总...`);
-    const responseStream = await ai.models.generateContentStream({
-      model: "gemini-3-flash-preview",
-      contents: summaryPrompt,
-      config: { temperature: 0.1 }
-    });
-    return responseStream;
+    try {
+        const responseStream = await ai.models.generateContentStream({
+          model: settings?.geminiFastModel || "gemini-2.5-flash",
+          contents: summaryPrompt,
+          config: { temperature: 0.1 }
+        });
+        return responseStream;
+    } catch (e2: any) {
+        console.error("Synthesizer flash model error:", e2);
+        throw e2;
+    }
   }
 }

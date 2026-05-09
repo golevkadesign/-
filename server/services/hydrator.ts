@@ -1,4 +1,4 @@
-import { queryYahooFinance } from "./yahooFinance";
+import { getRealTimeQuotes } from "./marketData";
 import { extractTickers } from "./utils";
 
 import * as crypto from 'crypto';
@@ -19,8 +19,8 @@ export interface DataProvider {
 const CACHE_TTL = 5 * 60 * 1000;
 const cache = new Map<string, { timestamp: number, data: any }>();
 
-class YahooFinanceProvider implements DataProvider {
-    name = "YahooFinance";
+class MarketDataProvider implements DataProvider {
+    name = "MarketData";
     
     async fetch({ message, contextData, extractedTickers }: DataProviderParams) {
         let symbolsToFetch = extractedTickers || [];
@@ -31,18 +31,18 @@ class YahooFinanceProvider implements DataProvider {
         
         if (symbolsToFetch.length === 0) return { source: this.name, payload: null };
         
-        const cacheKey = `yahoo_${symbolsToFetch.sort().join('_')}`;
+        const cacheKey = `market_${symbolsToFetch.sort().join('_')}`;
         const cached = cache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
             return { source: `${this.name} (Cache)`, payload: cached.data };
         }
         
         try {
-            const data = await queryYahooFinance(symbolsToFetch);
+            const data = await getRealTimeQuotes(symbolsToFetch);
             cache.set(cacheKey, { timestamp: Date.now(), data });
             return { source: this.name, payload: data };
         } catch (e) {
-            console.error("YahooFinance fetch error:", e);
+            console.error("MarketData fetch error:", e);
             return { source: this.name, payload: null };
         }
     }
@@ -199,7 +199,7 @@ class FirebaseStaticProvider implements DataProvider {
 // Registry of providers to allow easy plug-and-play decoupling
 export const dataProviders: DataProvider[] = [
     new FirebaseStaticProvider(),
-    new YahooFinanceProvider(),
+    new MarketDataProvider(),
     new LongbridgeLiveProvider()
 ];
 
@@ -217,7 +217,7 @@ export async function hydrateContext(message: string, contextData: any, settings
     for (const res of results) {
         if (res.payload) {
             sources.push(res.source);
-            if (res.source.startsWith("YahooFinance")) {
+            if (res.source.startsWith("MarketData")) {
                 hydratedData.marketData = res.payload;
             } else if (res.source.startsWith("LongbridgeLive")) {
                 hydratedData.livePortfolio = res.payload.livePortfolio;
@@ -225,6 +225,35 @@ export async function hydrateContext(message: string, contextData: any, settings
                  hydratedData.staticProfile = res.payload;
             }
         }
+    }
+    
+    // Auto-sync market prices into portfolio if available
+    let workingPortfolio = hydratedData.livePortfolio;
+    if (!workingPortfolio || workingPortfolio.length === 0) {
+        if (contextData?.distributions?.publicHoldings?.length > 0) {
+            workingPortfolio = JSON.parse(JSON.stringify(contextData.distributions.publicHoldings));
+        }
+    }
+    
+    if (workingPortfolio && workingPortfolio.length > 0 && hydratedData.marketData) {
+        for (const pos of workingPortfolio) {
+            const sym = pos.symbol || pos.name || '';
+            let mData = hydratedData.marketData[sym];
+            if (!mData) {
+                const foundKey = Object.keys(hydratedData.marketData).find(k => k.includes(sym) || sym.includes(k));
+                if (foundKey) mData = hydratedData.marketData[foundKey];
+            }
+            if (mData && mData.price) {
+                const quantity = Number(pos.quantity || 0);
+                if (quantity > 0) {
+                    pos.marketValue = Number((mData.price * quantity).toFixed(3));
+                } else if (pos.marketValue > 0) {
+                    pos.quantity = Number((pos.marketValue / mData.price).toFixed(3));
+                }
+                pos._livePrice = mData.price;
+            }
+        }
+        hydratedData.livePortfolio = workingPortfolio;
     }
     
     if (sources.length > 0 && onProgress) {

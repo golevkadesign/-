@@ -14,14 +14,19 @@ export const ReactECharts: React.FC<ReactEChartsProps> = ({ option, style }) => 
 
     let chartInstance = echarts.getInstanceByDom(chartRef.current);
     if (!chartInstance) {
-      chartInstance = echarts.init(chartRef.current, null, { renderer: 'canvas' });
+      chartInstance = echarts.init(chartRef.current, 'dark', { renderer: 'canvas' });
     }
 
     chartInstance.setOption({
       backgroundColor: 'transparent',
       textStyle: { fontFamily: 'Inter, sans-serif' },
-      tooltip: { backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f8fafc' } },
-      ...option
+      ...option,
+      tooltip: { 
+        backgroundColor: '#1e293b', 
+        borderColor: '#334155', 
+        textStyle: { color: '#f8fafc' },
+        ...(option.tooltip || {})
+      }
     }, true);
 
     const handleResize = () => chartInstance.resize();

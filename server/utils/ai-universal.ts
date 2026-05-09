@@ -137,7 +137,7 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           
           return fetchOpenAIStream(apiKey, targetModel, msgs, config?.temperature ?? 0.3);
         } else {
-          targetModel = model.includes('flash') ? settings.geminiFastModel : settings.geminiAdvancedModel;
+          targetModel = model.includes('flash') ? (settings.geminiFastModel || 'gemini-2.5-flash') : (settings.geminiAdvancedModel || 'gemini-2.5-pro');
           const apiKey = settings.geminiKey || process.env.GEMINI_API_KEY;
           if (!apiKey) throw new Error("缺少 Gemini API Key");
           const ai = new GoogleGenAI({ apiKey });
@@ -179,7 +179,7 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           const isJsonMode = config?.responseMimeType === 'application/json';
           return retryOperation(() => fetchOpenAI(apiKey, targetModel, msgs, config?.temperature ?? 0.3, isJsonMode));
         } else {
-          targetModel = model.includes('flash') ? settings.geminiFastModel : settings.geminiAdvancedModel;
+          targetModel = model.includes('flash') ? (settings.geminiFastModel || 'gemini-2.5-flash') : (settings.geminiAdvancedModel || 'gemini-2.5-pro');
           const apiKey = settings.geminiKey || process.env.GEMINI_API_KEY;
           if (!apiKey) throw new Error("缺少 Gemini API Key");
           const ai = new GoogleGenAI({ apiKey });

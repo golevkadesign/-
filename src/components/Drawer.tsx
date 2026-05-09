@@ -130,7 +130,7 @@ export const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState
       </div>
 
       <ChatList 
-        messages={chatHistory.flatMap((c, i) => {
+        messages={React.useMemo(() => chatHistory.flatMap((c, i) => {
            const msgs = [];
            if (c.user || (c.attachments && c.attachments.length > 0)) {
               msgs.push({ role: 'user', content: c.user || '', attachments: c.attachments });
@@ -139,7 +139,7 @@ export const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState
               msgs.push({ role: 'assistant', content: c.ai || '', thinking: c.thinking, hasMemoryUpdate: c.hasMemoryUpdate, _liveSources: data._liveSources, timeTaken: c.timeTaken });
            }
            return msgs;
-        })} 
+        }), [chatHistory, isLoading, data._liveSources])} 
         isTyping={isLoading} 
         onRegenerate={chatHistory.length > 0 ? handleRegenerate : undefined}
         onQuickPrompt={(prompt: string) => handleAiSubmit(prompt)}

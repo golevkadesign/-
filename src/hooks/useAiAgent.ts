@@ -267,7 +267,7 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
           try {
               if (user?.uid) {
                   await setDoc(doc(db, "userProfiles", user.uid), { userProfile: bffData.updatedProfile }, { merge: true });
-                  commitData({ ...data, userProfile: bffData.updatedProfile });
+                  commitData((prev: any) => ({ ...prev, userProfile: bffData.updatedProfile }));
               }
           } catch(e) {
               console.error("Failed to commit profile updates:", e);

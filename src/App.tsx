@@ -239,11 +239,11 @@ export default function App() {
     const arr = data.distributions?.liquidity || [];
     return {
       tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-      legend: { orient: 'vertical', left: 'left', textStyle: { color: 'var(--color-dash-secondary)' }, top: 'middle' },
+      legend: { orient: 'vertical', left: 'left', textStyle: { color: '#cbd5e1' }, top: 'middle' },
       color: ['#14b8a6', '#0ea5e9', '#3b82f6', '#0284c7', '#0369a1'],
       series: [{
         type: 'pie', radius: ['50%', '70%'], center: ['70%', '50%'],
-        itemStyle: { borderRadius: 6, borderColor: 'var(--color-dash-base)', borderWidth: 2 },
+        itemStyle: { borderRadius: 6, borderColor: '#0B0C0E', borderWidth: 2 },
         label: { show: false }, data: arr.length ? arr : [{ name: '无数据', value: 0 }]
       }]
     };
@@ -253,11 +253,11 @@ export default function App() {
     const arr = data.distributions?.expenses || [];
     return {
       tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-      legend: { orient: 'vertical', left: 'left', textStyle: { color: 'var(--color-dash-secondary)' }, top: 'middle' },
+      legend: { orient: 'vertical', left: 'left', textStyle: { color: '#cbd5e1' }, top: 'middle' },
       color: ['#0d9488', '#0891b2', '#2563eb', '#1e40af', '#115e59', '#1e3a8a'],
       series: [{
         type: 'pie', radius: ['50%', '70%'], center: ['70%', '50%'],
-        itemStyle: { borderRadius: 6, borderColor: 'var(--color-dash-base)', borderWidth: 2 },
+        itemStyle: { borderRadius: 6, borderColor: '#0B0C0E', borderWidth: 2 },
         label: { show: false }, data: arr.length ? arr : [{ name: '无数据', value: 0 }]
       }]
     };
@@ -275,13 +275,13 @@ export default function App() {
     return {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[1].name + ' : ¥' + (p[1].value?.toLocaleString() || 0) },
       grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
-      xAxis: { type: 'category', splitLine: { show: false }, data: names.length > 1 ? names : ['无数据'], axisLabel: { color: 'var(--color-dash-secondary)', interval: 0, formatter: (val: string) => val.length > 4 ? val.slice(0, 4) + '...' : val } },
-      yAxis: { type: 'value', splitLine: { lineStyle: { color: 'var(--color-dash-subtle)', type: 'dashed' } }, axisLabel: { show: false } },
+      xAxis: { type: 'category', splitLine: { show: false }, data: names.length > 1 ? names : ['无数据'], axisLabel: { color: '#cbd5e1', interval: 0, formatter: (val: string) => val.length > 4 ? val.slice(0, 4) + '...' : val } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#334155', type: 'dashed' } }, axisLabel: { show: false } },
       series: [
         { type: 'bar', stack: 'Total', itemStyle: { borderColor: 'transparent', color: 'transparent' }, data: helpData },
         {
-          type: 'bar', stack: 'Total', label: { show: true, position: 'top', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: 'var(--color-dash-primary)', fontSize: 10 },
-          itemStyle: { color: (p: any) => p.dataIndex === names.length - 1 ? 'var(--color-dash-primary)' : '#0ea5e9', borderRadius: [4, 4, 0, 0] }, data: mainData.length ? mainData : [0]
+          type: 'bar', stack: 'Total', label: { show: true, position: 'top', formatter: (p: any) => p.value >= 10000 ? (p.value / 10000).toFixed(1) + 'w' : (p.value?.toLocaleString() || '0'), color: '#f8fafc', fontSize: 10 },
+          itemStyle: { color: (p: any) => p.dataIndex === names.length - 1 ? '#f8fafc' : '#0ea5e9', borderRadius: [4, 4, 0, 0] }, data: mainData.length ? mainData : [0]
         }
       ]
     };
@@ -312,16 +312,16 @@ export default function App() {
           width: 12,
           right: 0,
           borderColor: 'transparent',
-          backgroundColor: 'var(--color-dash-surface-hover)',
+          backgroundColor: '#1e293b',
           fillerColor: '#38BDF855',
           handleSize: '100%',
         }
       ],
-      xAxis: [{ type: 'value', splitLine: { lineStyle: { color: 'var(--color-dash-subtle)', type: 'dashed' } }, axisLabel: { show: false } }],
-      yAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: 'var(--color-dash-secondary)', interval: 0, width: 80, overflow: 'truncate' } }],
+      xAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#334155', type: 'dashed' } }, axisLabel: { show: false } }],
+      yAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#cbd5e1', interval: 0, width: 80, overflow: 'truncate' } }],
       series: [{ 
         type: 'bar', 
-        label: { show: true, position: 'right', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: '#14b8a6', fontSize: 10 }, 
+        label: { show: true, position: 'right', formatter: (p: any) => p.value >= 10000 ? (p.value / 10000).toFixed(1) + 'w' : (p.value?.toLocaleString() || '0'), color: '#14b8a6', fontSize: 10 }, 
         barWidth: '60%', 
         data: values.length ? values : [0], 
         itemStyle: { color: '#14b8a6', borderRadius: [0, 4, 4, 0] } 
@@ -348,14 +348,14 @@ export default function App() {
           height: 12,
           bottom: 0,
           borderColor: 'transparent',
-          backgroundColor: 'var(--color-dash-surface-hover)',
+          backgroundColor: '#1e293b',
           fillerColor: '#38BDF855',
           handleSize: '100%',
         }
       ],
-      xAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: 'var(--color-dash-secondary)', interval: 0, rotate: symbols.length > 4 ? 30 : 0 } }],
-      yAxis: [{ type: 'value', splitLine: { lineStyle: { color: 'var(--color-dash-subtle)', type: 'dashed' } }, axisLabel: { show: false } }],
-      series: [{ type: 'bar', label: { show: true, position: 'top', formatter: (p: any) => (p.value / 10000).toFixed(0) + 'w', color: '#0369a1', fontSize: 10 }, barWidth: '40%', data: values.length ? values : [0], itemStyle: { color: '#0369a1', borderRadius: [4, 4, 0, 0] } }]
+      xAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#cbd5e1', interval: 0, rotate: symbols.length > 4 ? 30 : 0 } }],
+      yAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#334155', type: 'dashed' } }, axisLabel: { show: false } }],
+      series: [{ type: 'bar', label: { show: true, position: 'top', formatter: (p: any) => p.value >= 10000 ? (p.value / 10000).toFixed(1) + 'w' : (p.value?.toLocaleString() || '0'), color: '#0369a1', fontSize: 10 }, barWidth: '40%', data: values.length ? values : [0], itemStyle: { color: '#0369a1', borderRadius: [4, 4, 0, 0] } }]
     };
   }, [data.distributions?.options]);
 

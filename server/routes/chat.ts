@@ -180,9 +180,18 @@ chatRouter.post("/", async (req, res) => {
         const synthesisStream = await streamSynthesis(userTier, processedMessage, aggregatedData, expertAnalysis, passedSettings, sendProgress);
         
         let synthesizedText = "";
+        console.log("synthesisStream response structure:", synthesisStream);
         for await (const chunk of synthesisStream) {
             if (requestAborted) break;
-            const textChunk = chunk.text;
+            let textChunk = "";
+            try {
+               textChunk = chunk.text || "";
+            } catch (e) {
+               if (chunk.candidates?.[0]?.content?.parts) {
+                  textChunk = chunk.candidates[0].content.parts.map((p: any) => p.text || "").join('');
+               }
+            }
+            if (!textChunk) continue;
             synthesizedText += textChunk;
             res.write(`data: ${JSON.stringify({ type: 'summary_chunk', text: textChunk })}\n\n`);
             if ('flush' in res && typeof (res as any).flush === 'function') {
@@ -194,7 +203,7 @@ chatRouter.post("/", async (req, res) => {
         expertAnalysis['综合统筹结论'] = synthesizedText;
         sendProgress("✅ [阶段 3.9] 终端总结流式输出完成！");
     } catch (syntaxError: any) {
-        console.error("Syntax streams error", syntaxError);
+        console.error("Syntax streams error", syntaxError.stack || syntaxError);
         sendProgress(`⚠️ 总结流式输出异常: ${syntaxError.message}`);
     }
 

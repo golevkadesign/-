@@ -1,10 +1,63 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { Send, FileText, Bot, User as UserIcon, Loader2, Activity, ChevronDown, Sparkles, StopCircle, Check, Copy, RefreshCw, MessageSquare, X, Mic, Maximize2, Cpu } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 
-export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { messages: any[], isTyping: boolean, onRegenerate?: () => void, onQuickPrompt?: (p: string) => void }) {
+const CodeBlock = React.memo(({ inline, className, children, setFullScreenCode, isBlock }: any) => {
+  const match = /language-(\w+)/.exec(className || '');
+  const codeString = String(children).replace(/\n$/, '');
+  const [copied, setCopied] = useState(false);
+
+  if (!isBlock) {
+    return <code className="bg-dash-surface-hover text-dash-primary font-semibold px-2 py-1 rounded-[6px] border border-dash-subtle text-[0.85em] font-mono whitespace-pre-wrap tracking-wide">{children}</code>;
+  }
+
+  return (
+    <div className="relative group/code my-6 rounded-[20px] bg-dash-surface border border-dash-subtle overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between px-5 py-3 bg-dash-surface-hover border-b border-dash-subtle">
+        <span className="text-xs font-mono font-semibold uppercase tracking-widest text-dash-tertiary">{match?.[1] || 'Code'}</span>
+        <div className="flex gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+            <button onClick={() => {
+                navigator.clipboard.writeText(codeString);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            }} className="text-dash-tertiary hover:text-dash-primary p-2 rounded-lg hover:bg-dash-subtle transition-colors">
+                {copied ? <Check className="w-4 h-4 text-dash-green" /> : <Copy className="w-4 h-4" />}
+            </button>
+            <button onClick={() => setFullScreenCode({ code: codeString, language: match?.[1] || 'Code' })} className="text-dash-tertiary hover:text-dash-primary p-2 rounded-lg hover:bg-dash-subtle transition-colors hidden sm:block">
+                <Maximize2 className="w-4 h-4" />
+            </button>
+        </div>
+      </div>
+      <pre className="p-5 sm:p-6 overflow-x-auto text-[13px] sm:text-[14px] font-mono text-dash-primary leading-relaxed custom-scroll">
+        <code className={className}>{children}</code>
+      </pre>
+    </div>
+  );
+});
+
+const PComponent = React.memo(({ children }: any) => <div className="mb-4 text-dash-secondary">{children}</div>);
+const LiComponent = React.memo(({ children }: any) => <li className="mb-1 text-dash-secondary">{children}</li>);
+const StrongComponent = React.memo(({ children }: any) => <strong className="font-bold text-dash-primary">{children}</strong>);
+
+const LiveTimer = () => {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const interval = setInterval(() => {
+      setElapsed(Date.now() - start);
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-mono uppercase tracking-wider font-semibold bg-white/5 text-dash-tertiary border border-white/10">
+      <Cpu className="w-3.5 h-3.5 animate-pulse text-emerald-400" /> { (elapsed / 1000).toFixed(1) }s 耗时
+    </span>
+  );
+};
+
+export const ChatList = React.memo(function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { messages: any[], isTyping: boolean, onRegenerate?: () => void, onQuickPrompt?: (p: string) => void }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const chatEndRef = React.useRef<HTMLDivElement>(null);
   const [expandedThinking, setExpandedThinking] = React.useState<Record<number, boolean>>({});
@@ -19,6 +72,19 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
+
+  const markdownComponents = useMemo(() => ({
+    p: PComponent,
+    li: LiComponent,
+    strong: StrongComponent,
+    pre: ({ children }: any) => {
+      if (React.isValidElement(children)) {
+        return React.cloneElement(children, { isBlock: true } as any);
+      }
+      return <>{children}</>;
+    },
+    code: (props: any) => <CodeBlock {...props} setFullScreenCode={setFullScreenCode} />
+  }), [setFullScreenCode]);
 
   const handleScroll = () => {
     if (containerRef.current) {
@@ -150,67 +216,9 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
                         </div>
                     ) : (
                         <div className="text-[15px] sm:text-[16px] leading-[1.8] ai-message break-words w-full space-y-4 text-dash-primary font-medium tracking-tight">
-                          <Markdown
-                            components={{
-                              p: ({node, children}) => (
-                                <motion.p 
-                                  initial={{ opacity: 0, y: 10 }} 
-
-                               animate={{ opacity: 1, y: 0 }} 
-                               transition={{ type: "spring", stiffness: 400, damping: 25 }} 
-                               className="mb-4 text-dash-secondary" 
-                             >
-                               {children}
-                             </motion.p>
-                           ),
-                           li: ({node, children}) => (
-                             <motion.li
-                               initial={{ opacity: 0, x: -10 }} 
-                               animate={{ opacity: 1, x: 0 }} 
-                               transition={{ type: "spring", stiffness: 400, damping: 25 }} 
-                               className="mb-1 text-dash-secondary"
-                             >
-                               {children}
-                             </motion.li>
-                           ),
-                           strong: ({node, children}) => (
-                             <strong className="font-bold text-dash-primary">
-                               {children}
-                             </strong>
-                           ),
-                           code: ({node, inline, className, children, ...props}: any) => {
-                             const match = /language-(\w+)/.exec(className || '');
-                             const codeString = String(children).replace(/\n$/, '');
-                             return !inline ? (
-                               <motion.div 
-                                 initial={{ opacity: 0, y: 10 }} 
-                                 animate={{ opacity: 1, y: 0 }} 
-                                 className="relative group/code my-6 rounded-[20px] bg-dash-surface border border-dash-subtle overflow-hidden shadow-sm"
-                               >
-                                 <div className="flex items-center justify-between px-5 py-3 bg-dash-surface-hover border-b border-dash-subtle">
-                                   <span className="text-xs font-mono font-semibold uppercase tracking-widest text-dash-tertiary">{match?.[1] || 'Code'}</span>
-                                   <div className="flex gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
-                                       <button onClick={() => {
-                                           navigator.clipboard.writeText(codeString);
-                                           handleCopy(codeString, parseInt(`${i}99`));
-                                       }} className="text-dash-tertiary hover:text-dash-primary p-2 rounded-lg hover:bg-dash-subtle transition-colors">
-                                           {copiedIndex === parseInt(`${i}99`) ? <Check className="w-4 h-4 text-dash-green" /> : <Copy className="w-4 h-4" />}
-                                       </button>
-                                       <button onClick={() => setFullScreenCode({ code: codeString, language: match?.[1] || 'Code' })} className="text-dash-tertiary hover:text-dash-primary p-2 rounded-lg hover:bg-dash-subtle transition-colors hidden sm:block">
-                                           <Maximize2 className="w-4 h-4" />
-                                       </button>
-                                   </div>
-                                 </div>
-                                 <pre className="p-5 sm:p-6 overflow-x-auto text-[13px] sm:text-[14px] font-mono text-dash-primary leading-relaxed custom-scroll">
-                                   <code className={className} {...props}>{children}</code>
-                                 </pre>
-                               </motion.div>
-                             ) : (
-                               <code className="bg-dash-surface-hover text-dash-primary font-semibold px-2 py-1 rounded-[6px] border border-dash-subtle text-[0.85em] font-mono whitespace-pre-wrap tracking-wide" {...props}>{children}</code>
-                             );
-                           }
-                         }}
-                       >{msg.content}</Markdown>
+                          <Markdown components={markdownComponents}>
+                            {msg.content}
+                          </Markdown>
                        {msg.content && (
                            <div className="mt-8 pt-4 border-t border-white/5 flex flex-col gap-3">
                              {/* Explainable Output Summary */}
@@ -225,11 +233,13 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
                                    <UserIcon className="w-3.5 h-3.5" /> Profile Memory Updated
                                  </span>
                                )}
-                               {msg.timeTaken !== undefined && (
+                               {(isTyping && i === messages.length - 1 && msg.timeTaken === undefined) ? (
+                                 <LiveTimer />
+                               ) : msg.timeTaken !== undefined ? (
                                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-mono uppercase tracking-wider font-semibold bg-white/5 text-dash-tertiary border border-white/10">
                                    <Cpu className="w-3.5 h-3.5" /> { (msg.timeTaken / 1000).toFixed(1) }s 耗时
                                  </span>
-                               )}
+                               ) : null}
                              </div>
 
                              <div className="flex items-center gap-2 opacity-50 hover:opacity-100 transition-opacity mt-2">
@@ -292,7 +302,7 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
       </AnimatePresence>
     </div>
   );
-}
+});
 
 export function ChatInput({ input, handleInputChange, handleSubmit, isLoading, onKeyDown, onStop, onPaste, hasAttachments = false }: any) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
