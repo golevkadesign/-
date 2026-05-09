@@ -225,6 +225,11 @@ export function ChatList({ messages, isTyping, onRegenerate, onQuickPrompt }: { 
                                    <UserIcon className="w-3.5 h-3.5" /> Profile Memory Updated
                                  </span>
                                )}
+                               {msg.timeTaken !== undefined && (
+                                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-mono uppercase tracking-wider font-semibold bg-white/5 text-dash-tertiary border border-white/10">
+                                   <Cpu className="w-3.5 h-3.5" /> { (msg.timeTaken / 1000).toFixed(1) }s 耗时
+                                 </span>
+                               )}
                              </div>
 
                              <div className="flex items-center gap-2 opacity-50 hover:opacity-100 transition-opacity mt-2">

@@ -1,5 +1,5 @@
 import { runAnalysisAgent } from "./agents";
-import { getUniversalAiClient } from "../../src/lib/ai-universal";
+import { getUniversalAiClient } from "../utils/ai-universal";
 import { DEFAULT_PROMPTS } from "../../src/lib/defaultPrompts";
 
 // 使用免费、极速的 Flash 模型做第一层意图拦截与提取
@@ -171,4 +171,44 @@ export async function evaluateWealthStatus(userTier: string, message: string, hi
   
   // 综合分析已经包含在 agentResults 中，交给前端的 UI Builder 进一步组装和流式输出
   return agentResults;
+}
+
+export async function streamSynthesis(userTier: string, message: string, externalData: any, agentResults: any, settings?: any, onProgress?: (msg: string) => void) {
+  const ai = getUniversalAiClient(settings);
+  if (onProgress) onProgress(`⏳ [阶段 3.8] 各节点数据已回流，启动 CEO 级全局 Synthesizer 流式结论汇总...`);
+
+  // 上下文脱水：手动剔除 ECharts 配置等过长的渲染源码，仅保留分析结论
+  const dehydratedResults: Record<string, string> = { ...agentResults };
+  for (const key in dehydratedResults) {
+    if (typeof dehydratedResults[key] === 'string') {
+      // 一定程度上剔除代码块以减少 Token 大小
+      dehydratedResults[key] = dehydratedResults[key].replace(/```(?:json|javascript|echarts)?\s*[\s\S]*?\s*```/g, "[图表配置源码已脱水]");
+    }
+  }
+
+  const template = settings?.agentPrompts?.orchestrator || DEFAULT_PROMPTS.orchestrator;
+  const summaryPrompt = template
+    .replace('{userTier}', () => userTier)
+    .replace('{message}', () => message)
+    .replace('{userProfileRAG}', () => JSON.stringify(externalData?.contextData?.userProfile || {}, null, 2))
+    .replace('{livePortfolioRAG}', () => JSON.stringify(externalData?.livePortfolio || externalData?.contextData?.distributions?.publicHoldings || [], null, 2))
+    .replace('{agentResults}', () => JSON.stringify(dehydratedResults, null, 2));
+
+  try {
+    const responseStream = await ai.models.generateContentStream({
+      model: "gemini-3.1-pro-preview",
+      contents: summaryPrompt,
+      config: { temperature: 0.1 }
+    });
+    return responseStream;
+  } catch (e: any) {
+    console.error("Synthesizer pro model error, falling back to flash:", e);
+    if (onProgress) onProgress(`⚠️ [阶段 3.9] Pro模型高负载，降级至Flash模型进行全局汇总...`);
+    const responseStream = await ai.models.generateContentStream({
+      model: "gemini-3-flash-preview",
+      contents: summaryPrompt,
+      config: { temperature: 0.1 }
+    });
+    return responseStream;
+  }
 }

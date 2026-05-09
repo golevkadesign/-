@@ -1,0 +1,59 @@
+Status: 200
+[26ms] Received chunk: 67 bytes
+data: {"type":"progress","message":"⏳ [阶段 0] 已接收通讯矩阵指令与上下文凭证..."}\n\n
+[26ms] Received chunk: 75 bytes
+data: {"type":"progress","message":"⏳ [阶段 1] 侧翼调度：启动高速闪电意图网络及 RAG 记忆..."}\n\n
+[26ms] Received chunk: 58 bytes
+data: {"type":"progress","message":"✅ [阶段 1] 意图网络分析完成。"}\n\n
+[26ms] Received chunk: 80 bytes
+data: {"type":"progress","message":"⏳ [阶段 2] 开始上下文 Hydration：接入外部三方数据及实时源..."}\n\n
+[26ms] Received chunk: 85 bytes
+data: {"type":"progress","message":"⏳ [阶段 2.1] 启动 Context Hydrator 进行子节点并发提取调度..."}\n\n
+[26ms] Received chunk: 77 bytes
+data: {"type":"progress","message":"✅ [阶段 2] 上下文 Hydration 注水拼装完成并已传导至下文。"}\n\n
+[26ms] Received chunk: 116 bytes
+data: {"type":"partial_result","data":{"userTier":"General","externalData":{"marketData":{}},"update
+[26ms] Received chunk: 68 bytes
+data: {"type":"progress","message":"⏳ [阶段 3] 移交总控台：开始深度金融领域解析..."}\n\n
+[26ms] Received chunk: 91 bytes
+data: {"type":"progress","message":"⏳ [阶段 3.1] Orchestrator 核心调度：基于 General 分发并行分析线程..."}\n\n
+[27ms] Received chunk: 69 bytes
+data: {"type":"progress","message":"⏳ [子节点派发] 连通 CFP 全栖财务规划师节点..."}\n\n
+[27ms] Received chunk: 90 bytes
+data: {"type":"progress","message":"⏳ [子节点派发] 唤醒 Devil's Advocate (杠精节点) 进行抗脆性黑天鹅压测..."}\n\n
+[27ms] Received chunk: 118 bytes
+data: {"type":"progress","message":"\n✅ **[阶段 3.x] [个人综合财务评估完成]**\n[专家分析服务异常] 无法获取 General Finance 板
+[27ms] Received chunk: 116 bytes
+data: {"type":"progress","message":"\n✅ **[阶段 3.x] [黑天鹅杠精压测完成]**\n[专家分析服务异常] 无法获取 Devil Advocate 板块的
+[27ms] Received chunk: 77 bytes
+data: {"type":"progress","message":"✅ [阶段 3.8] 各节点数据已回流完毕，准备进行前端交互引擎渲染..."}\n\n
+[5023ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[10023ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[15024ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[20024ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[25026ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[30026ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[35027ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[40029ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[45028ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[50029ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[55029ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[60030ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[65031ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[70032ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n
+[75033ms] Received chunk: 28 bytes
+data: {"type":"heartbeat"}\n\n

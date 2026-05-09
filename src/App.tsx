@@ -1,6 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
 import { getSettings, saveSettings, AppSettings } from './lib/settings';
-import { getUniversalAiClient } from './lib/ai-universal';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from './components/Card';
 import { ReactECharts } from './components/ReactECharts';
@@ -421,17 +419,36 @@ export default function App() {
    - 💎 资源杠杆锚点 (在这个阶段，最应该优先把资金或精力倾注在什么地方)`;
 
     try {
-      const ai = getUniversalAiClient();
-      const responseStream = await ai.models.generateContentStream({
-        model: "gemini-3.1-pro-preview",
-        contents: prompt,
-        config: { temperature: 0.3 }
+      const response = await fetch('/api/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          settings: getSettings(),
+          customApiKey: localStorage.getItem('custom_gemini_api_key') || undefined
+        })
       });
 
+      if (!response.body) throw new Error('No readable stream from /api/plan');
+      
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
       let accumulatedText = '';
       
-      for await (const chunk of await responseStream) {
-        accumulatedText += chunk.text;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunkStr = decoder.decode(value, { stream: true });
+        const lines = chunkStr.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.error) throw new Error(parsed.error);
+              if (parsed.text) {
+                accumulatedText += parsed.text;
         
         let thinkMatch = accumulatedText.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
         let currentThinkLine = '建立深度推演图谱...';
@@ -452,6 +469,12 @@ export default function App() {
           ...prev,
           [planKey]: { status: 'thinking', result: resText, thinking: currentThinkLine }
         }));
+              }
+            } catch (e) {
+              // Ignore partial JSON parsing errors
+            }
+          }
+        }
       }
 
       setNodePlans(prev => ({

@@ -1,4 +1,4 @@
-import { getUniversalAiClient } from "../../src/lib/ai-universal";
+import { getUniversalAiClient } from "../utils/ai-universal";
 import { DEFAULT_PROMPTS } from "../../src/lib/defaultPrompts";
 
 export async function runAnalysisAgent(userTier: string, contextData: any, history: any[], section: string, query: string, settings?: any, attachments: any[] = []) {

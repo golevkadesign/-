@@ -3,7 +3,7 @@ import { queryYahooFinance } from "../services/yahooFinance";
 import { extractTickers } from "../services/utils";
 import { evaluateWealthStatus } from "../services/orchestrator";
 import { hydrateContext } from "../services/hydrator";
-import { getUniversalAiClient } from "../../src/lib/ai-universal";
+import { getUniversalAiClient } from "../utils/ai-universal";
 
 import { DEFAULT_RAG_SCHEMA } from "../../src/lib/defaultPrompts";
 
@@ -15,9 +15,10 @@ chatRouter.post("/", async (req, res) => {
   let requestAborted = false;
   let keepAlive: NodeJS.Timeout | undefined;
 
-  req.on('close', () => {
+  res.on('close', () => {
     requestAborted = true;
-    console.log("[chat] Client disconnected. Aborting backend tasks.");
+    console.log("[chat] Client disconnected or response closed. Aborting backend tasks.");
+    if (keepAlive) clearInterval(keepAlive);
   });
 
   const sendProgress = (msg: string) => {
@@ -149,7 +150,53 @@ chatRouter.post("/", async (req, res) => {
     sendProgress("⏳ [阶段 3] 移交总控台：开始深度金融领域解析...");
     const expertAnalysis = await evaluateWealthStatus(userTier, processedMessage, history, aggregatedData, sendProgress, passedSettings, intentResult.targetModules || [], attachments);
     
-    if (requestAborted) return;
+    if (requestAborted) {
+        console.log("Request aborted, exiting route");
+        return;
+    }
+
+    // We do NOT call res.end() yet via sendResult. First we stream the synthesis chunk by chunk.
+    sendProgress("⏳ [阶段 3.8] 正在启动最终总结与渲染模型...");
+    
+    // Send the partial result (this tells the client we have the raw expertAnalysis)
+    // We send it directly without res.end()
+    if (!isResponseEnded) {
+       res.write(`data: ${JSON.stringify({ 
+           type: 'partial_result', 
+           data: {
+               userTier, 
+               externalData: { marketData: hydratedData.marketData || {}, livePortfolio: hydratedData.livePortfolio }, 
+               expertAnalysis, 
+               updatedProfile: intentResult.updatedProfile 
+           } 
+       })}\n\n`);
+       if ('flush' in res && typeof (res as any).flush === 'function') {
+         (res as any).flush();
+       }
+    }
+
+    try {
+        const { streamSynthesis } = await import("../services/orchestrator");
+        const synthesisStream = await streamSynthesis(userTier, processedMessage, aggregatedData, expertAnalysis, passedSettings, sendProgress);
+        
+        let synthesizedText = "";
+        for await (const chunk of synthesisStream) {
+            if (requestAborted) break;
+            const textChunk = chunk.text;
+            synthesizedText += textChunk;
+            res.write(`data: ${JSON.stringify({ type: 'summary_chunk', text: textChunk })}\n\n`);
+            if ('flush' in res && typeof (res as any).flush === 'function') {
+                (res as any).flush();
+            }
+        }
+        
+        // After streaming is done, attach the completed summary into the expertAnalysis
+        expertAnalysis['综合统筹结论'] = synthesizedText;
+        sendProgress("✅ [阶段 3.9] 终端总结流式输出完成！");
+    } catch (syntaxError: any) {
+        console.error("Syntax streams error", syntaxError);
+        sendProgress(`⚠️ 总结流式输出异常: ${syntaxError.message}`);
+    }
 
     sendProgress("✅ [阶段 4] 本地推流阻断释放，将 Agent 数据全阵列推送回客户端。");
 

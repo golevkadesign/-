@@ -2,8 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { getDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getSettings } from '../lib/settings';
-import { getUniversalAiClient } from '../lib/ai-universal';
-import { UI_SUMMARY_PROMPT } from '../App';
 import { Attachment } from '../App';
 
 export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesizing }: any) {
@@ -14,7 +12,7 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
   const abortControllerRef = useRef<AbortController | null>(null);
   const isChatLoaded = useRef(false);
 
-  const [chatHistory, setChatHistory] = useState<{ user: string, ai: string, attachments: Attachment[], thinking?: string, isThinkingExpanded?: boolean, hasMemoryUpdate?: boolean, _liveSources?: string[] }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ user: string, ai: string, attachments: Attachment[], thinking?: string, isThinkingExpanded?: boolean, hasMemoryUpdate?: boolean, _liveSources?: string[], timeTaken?: number }[]>([]);
 
   useEffect(() => {
     const handleClearChat = () => {
@@ -123,6 +121,7 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
   };
 
   const handleAiSubmit = async (overrideMsg?: string, overrideAtts?: Attachment[]) => {
+    const startTime = Date.now();
     const actualMsg = typeof overrideMsg === 'string' ? overrideMsg : inputMsg;
     const attsToSend = overrideAtts || [...attachments];
 
@@ -139,14 +138,30 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
     const signal = abortControllerRef.current.signal;
 
     try {
-      // 1. Gather Context from BFF
+      // 1. Gather Context from BFF & Strip heavy data
+      const stripHeavyData = (obj: any): any => {
+         if (!obj || typeof obj !== 'object') return obj;
+         if (Array.isArray(obj)) return obj.map(stripHeavyData);
+         const newObj: any = {};
+         for (const key in obj) {
+            if (key === 'chartOptions' || (typeof obj[key] === 'string' && obj[key].startsWith('data:image/'))) {
+               newObj[key] = '[Stripped for Agent Payload]';
+            } else {
+               newObj[key] = stripHeavyData(obj[key]);
+            }
+         }
+         return newObj;
+      };
+      
+      const cleanedContextData = stripHeavyData(data);
+
       const contextRes = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
            message: userMsg,
            history: chatHistory.map(c => ({ user: c.user, ai: c.ai })),
-           contextData: data,
+           contextData: cleanedContextData,
            settings: getSettings(),
            userId: user?.uid,
            customApiKey: localStorage.getItem('custom_gemini_api_key') || undefined,
@@ -164,6 +179,7 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
       let bffData: any = null;
       let serverError: string | null = null;
       let thinkingProgress = "";
+      let streamedAi = "";
       const reader = contextRes.body?.getReader();
       const decoder = new TextDecoder("utf-8");
       
@@ -219,6 +235,18 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
                       }
                    } else if (parsed.type === 'result') {
                       bffData = parsed.data;
+                   } else if (parsed.type === 'summary_chunk') {
+                      streamedAi += parsed.text;
+                      let displayText = streamedAi;
+                      const jsonMatch = streamedAi.indexOf('```json');
+                      if (jsonMatch !== -1) {
+                         displayText = streamedAi.substring(0, jsonMatch).trim();
+                      }
+                      setChatHistory(prev => {
+                         const newHist = [...prev];
+                         newHist[newHist.length - 1].ai = displayText;
+                         return newHist;
+                      });
                    } else if (parsed.type === 'error') {
                       serverError = parsed.error;
                    }
@@ -270,40 +298,8 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
          return;
       }
       
-      const analysisText = Object.entries(bffData.expertAnalysis || {})
-         .map(([k, v]) => `[${k}]\n${typeof v === 'string' ? v : JSON.stringify(v)}`)
-         .join('\n\n');
-
-      // 3. Client-side UI Summary Agent
-      const summaryInput = `Tier: ${bffData.userTier}\nUserMsg: ${userMsg}\nHardcore Analysis Result:\n${analysisText}\n\nCurrent Terminal State (SDUI JSON):\n${JSON.stringify(data, null, 2)}`;
-      
-      const ai = getUniversalAiClient();
-      const responseStream = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
-        contents: summaryInput,
-        config: {
-          systemInstruction: UI_SUMMARY_PROMPT,
-          temperature: 0.3
-        }
-      });
-      
-      let txt = "";
-      for await (const chunk of responseStream) {
-        if (signal.aborted) throw new Error('AbortError');
-        txt += chunk.text;
-        
-        let displayText = txt;
-        const jsonMatch = txt.indexOf('```json');
-        if (jsonMatch !== -1) {
-            displayText = txt.substring(0, jsonMatch).trim();
-        }
-
-        setChatHistory(prev => {
-           const newHist = [...prev];
-           newHist[newHist.length - 1].ai = displayText;
-           return newHist;
-        });
-      }
+      // 3. 全量 JSON 解析 (仅在收到最终 result 后执行)
+      const txt = streamedAi || bffData.expertAnalysis?.['综合统筹结论'] || "";
 
       let sduiPayload: any = null;
       try {
@@ -376,6 +372,15 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
         return newHist;
       });
     } finally {
+      const endTime = Date.now();
+      const diff = endTime - startTime;
+      setChatHistory(prev => {
+        const newHist = [...prev];
+        if (newHist.length > 0) {
+           newHist[newHist.length - 1].timeTaken = diff;
+        }
+        return newHist;
+      });
       setIsLoading(false);
       setIsSynthesizing?.(false);
       abortControllerRef.current = null;

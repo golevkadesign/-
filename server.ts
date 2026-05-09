@@ -5,6 +5,7 @@ import path from "path";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { chatRouter } from "./server/routes/chat";
+import planRouter from "./server/routes/plan";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -61,6 +62,7 @@ async function startServer() {
 
   // API Configuration
   app.use("/api/chat", chatRouter);
+  app.use("/api/plan", planRouter);
 
   // Health check
   app.get("/api/health", (req, res) => {

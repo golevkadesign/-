@@ -1,4 +1,3 @@
-import { getSettings } from './settings';
 import { GoogleGenAI } from '@google/genai';
 
 // Simple polyfill for generateContentStream for OpenAI
@@ -76,9 +75,9 @@ async function fetchOpenAI(apiKey: string, model: string, messages: any[], tempe
 }
 
 export const getUniversalAiClient = (passedSettings?: any) => {
-  const getS = () => passedSettings || getSettings();
+  const getS = () => passedSettings || {};
 
-  const retryOperation = async (operation: () => Promise<any>, maxRetries = 5, baseDelay = 2000) => {
+  const retryOperation = async (operation: () => Promise<any>, maxRetries = 2, baseDelay = 500) => {
     let attempt = 0;
     while (true) {
       try {
@@ -95,7 +94,8 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           throw error;
         }
         
-        const delay = baseDelay * Math.pow(2, attempt - 1);
+        // Short fixed delay, without exponential backoff
+        const delay = baseDelay;
         console.log(`[AI Retry] Transient error encountered, retrying (${attempt}/${maxRetries}) in ${delay}ms...`, errMessage);
         await new Promise(res => setTimeout(res, delay));
       }
