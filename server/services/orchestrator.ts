@@ -194,14 +194,18 @@ export async function streamSynthesis(userTier: string, message: string, externa
 ========================================
 【前端渲染与状态更新契约 (CRITICAL)】
 你的任务分为两步，必须严格按顺序输出：
-第一步：先输出给用户看的【高情商且犀利的文字回复】(不要带json，使用 markdown 排版)。作为主理人，你需要把专家们提供的核心数据进行综合提炼，给出具体的实操建议。
+第一步：先输出给用户看的【高情商且犀利的文字回复】(不要带json，使用 markdown 排版)。作为主理人，你需要把专家们提供的核心数据进行综合提炼，给出具体的实操建议，不要说场面话。
 第二步：在回答的所有文字结束后，最后输出一个包含 JSON 数据的代码块，用于底层系统的前端渲染 SDUI JSON Schema 更新补丁（Patch）。
 
 核心规则：
 - 除必须格式外，所有UI标题（如图表标题）使用中文。
 - metrics 中包含 netWorthSummary, liquiditySummary, safetyRatioSummary, fcfSummary 四个字段。
-- 重要：**增量更新（Differential Update）**。前端会将你的 \`updateGlobalState\` 输出与当前的 Terminal State 进行合并。对于完全没有变化的板块，**请直接省略该字段**，不要输出空数组/空字符串来覆盖原有的有效数据！！比如：如果你本次不涉及 fixedAssets 更新，则 updateGlobalState 里面绝对不可出现 fixedAssets 字段。
-- 只做数据的更新，绝不重置旧的有效资产结构。
+- 对于股票持仓(publicHoldings)：如果有新分析，则在 \`insights.publicText\` 中输出纯文字结论（一只股票一行信息，枚举数量/成本/市值等）；在 \`insights.publicSummary\` 输出总体总结。
+- 对于期权(options)：提取并枚举。
+- 【严禁捏造Mock假数据】决不允许凭空捏造数值！
+- 请在 insights 对象中，提供专门负责该板块的Agent的具体客观分析和切实施政建议。
+- 重要：**增量更新（Differential Update）**。你只需要在 \`updateGlobalState\` 中返回**需要修改或更新**的字段。前端会将你的输出与当前的 Terminal State 进行合并（Shallow Merge / 深层合并）。对于完全没有变化的板块，**请直接省略该字段**，不要输出空数组/空字符串来覆盖原有的有效数据！！比如：如果你本次分析没有涉及 fixedAssets，那么 updateGlobalState 里面就不要出现 fixedAssets 字段。
+- 只做数据的更新，绝不重置旧的有效资产结构。如果在硬核经济策略数据中提到某些数据失效了或被抛售了，那才将其重置为 []。
 
 当前前端面板状态 (TERMINAL_STATE)：
 ${JSON.stringify({ 
@@ -217,9 +221,12 @@ ${JSON.stringify({
   "sduiSchema": [],
   "updateGlobalState": {
     "metrics": { "netWorth": 1000000, "netWorthSummary": "总结短句..." },
+    "userPersona": { "tags": ["稳健型", "高薪资"], "description": "您的核心画像..." },
+    "goal": { "name": "核心破局目标", "current": 1000, "target": 5000, "index": 0.2 },
     "distributions": { "liquidity": [{"name": "现金", "value": 100}] },
-    "lifeStrategiesShort": [ { "timeNode": "2024", "title": "节点1", "description": "描述" } ],
-    "insights": { "publicSummary": "..." }
+    "lifeStrategiesShort": [ { "timeNode": "2024-2025", "title": "节点1", "description": "描述" } ],
+    "lifeStrategiesLong": [ { "timeNode": "未来 10 年", "title": "高维规划", "description": "描述" } ],
+    "insights": { "liquidity": "资金池流动性建议..." }
   }
 }
 \`\`\`

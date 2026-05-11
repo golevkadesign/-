@@ -1,5 +1,6 @@
 import { getSettings, saveSettings, AppSettings } from './lib/settings';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { getDonutOption, getExpenseOption, getWaterfallOption, getHoldingsOption, getOptionsOption } from './components/chart-configs';
 import { Card } from './components/Card';
 import { ReactECharts } from './components/ReactECharts';
 import { SettingsModal } from './components/SettingsModal';
@@ -12,120 +13,11 @@ import { Drawer } from './components/Drawer';
 
 // Replaced by getUniversalAiClient
 
-export const UI_SUMMARY_PROMPT = `
-你是一个专业的前端 UI 生成引擎与首席财富管家 (Summary Synthesizer & Server-Driven UI Builder)。
-你接收多名底层分析师专家输出的硬核经济策略数据，以及当前的 Terminal State。
-
-你的任务分为两步，必须严格按顺序输出：
-第一步：先输出给用户看的【高情商且犀利的文字回复】(不要带json，使用 markdown 排版)。作为主理人，你需要把专家们提供的核心数据进行综合提炼，给出具体的实操建议，不要说场面话。
-第二步：在回答的所有文字结束后，最后输出一个包含 JSON 数据的代码块，用于底层系统的前端渲染 SDUI JSON Schema 更新补丁（Patch）。
-
-核心规则：
-- 除必须格式外，所有UI标题（如图表标题）使用中文。
-- metrics 中包含 netWorthSummary, liquiditySummary, safetyRatioSummary, fcfSummary 四个字段。
-- 对于股票持仓(publicHoldings)：如果有新分析，则在 \`insights.publicText\` 中输出纯文字结论（一只股票一行信息，枚举数量/成本/市值等）；在 \`insights.publicSummary\` 输出总体总结。
-- 对于期权(options)：提取并枚举。
-- 【严禁捏造Mock假数据】决不允许凭空捏造数值！
-- 请在 insights 对象中，提供专门负责该板块的Agent的具体客观分析和切实施政建议。
-- 重要：**增量更新（Differential Update）**。你只需要在 \`updateGlobalState\` 中返回**需要修改或更新**的字段。前端会将你的输出与当前的 Terminal State 进行合并（Shallow Merge / 深层合并）。对于完全没有变化的板块，**请直接省略该字段**，不要输出空数组/空字符串来覆盖原有的有效数据！！比如：如果你本次分析没有涉及 fixedAssets，那么 updateGlobalState 里面就不要出现 fixedAssets 字段。
-- 只做数据的更新，绝不重置旧的有效资产结构。如果在硬核经济策略数据中提到某些数据失效了或被抛售了，那才将其重置为 []。
-
-注意！返回的文本必须符合以下严格结构：
-
-你的综合建议文字描述（Markdown格式）可以分多段，直接写...
-
-\`\`\`json
-{
-  "sduiSchema": [],
-  "updateGlobalState": {
-    "metrics": { "netWorth": 1000000, "netWorthSummary": "总结短句..." },
-    "userPersona": { "tags": ["稳健型", "高薪资"], "description": "您的核心画像..." },
-    "goal": { "name": "核心破局目标", "current": 1000, "target": 5000, "index": 0.2 },
-    "distributions": { "liquidity": [{"name": "现金", "value": 100}] },
-    "lifeStrategiesShort": [ { "timeNode": "2024-2025", "title": "节点1", "description": "描述" } ],
-    "lifeStrategiesLong": [ { "timeNode": "未来 10 年", "title": "高维规划", "description": "描述" } ],
-    "insights": { "liquidity": "资金池流动性建议..." }
-  }
-}
-\`\`\`
-`;
 import { Sparkles, LogOut, ChevronDown, User, Activity, Loader2, RefreshCw, Cpu, Settings, Bot } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { ChartWidget } from './components/ChartWidget';
 
-// Component Registry for Server-Driven UI (SDUI)
-const ComponentRegistry: Record<string, React.FC<any>> = {
-  MetricsCard: ({ title, value }) => <Card title={title} value={
-    typeof value === 'string' && value.includes('¥') ? (
-      <span className="tabular-nums">{value}</span>
-    ) : (
-      <span className="tabular-nums">{typeof value === 'number' ? `¥${value.toLocaleString()}` : value}</span>
-    )
-  } />,
-  EChartsPie: ({ data }) => {
-    if (!data || data.length === 0) {
-      return (
-        <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 h-[350px] shadow-sm flex flex-col items-center justify-center animate-pulse">
-          <div className="w-40 h-40 rounded-full border-8 border-dash-subtle/30 border-t-dash-subtle/60 animate-spin" />
-          <div className="mt-6 h-3 w-24 bg-dash-subtle/50 rounded-full" />
-        </div>
-      );
-    }
-    return (
-      <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 h-[350px] shadow-sm flex flex-col">
-         <div className="flex-1 min-h-0">
-            <ReactECharts option={{ tooltip: { trigger: 'item' }, series: [{ type: 'pie', data, radius: ['40%', '70%'] }] }} />
-         </div>
-      </div>
-    );
-  },
-  Timeline12X: ({ title, nodes }) => {
-    if (!nodes || nodes.length === 0) {
-      return (
-         <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 shadow-sm relative overflow-hidden animate-pulse">
-            <div className="h-6 w-48 bg-dash-subtle/50 rounded-lg mb-8" />
-            <div className="relative border-l border-dash-subtle ml-4 space-y-10 my-4">
-               {[1,2,3].map(i => (
-                 <div key={i} className="pl-8 relative">
-                    <div className="absolute w-4 h-4 bg-dash-subtle rounded-full -left-[8.5px] top-1" />
-                    <div className="h-5 w-20 bg-dash-subtle/50 rounded-md mb-3" />
-                    <div className="h-6 w-1/3 bg-dash-subtle/50 rounded mb-2" />
-                    <div className="h-20 w-full bg-dash-surface rounded-2xl" />
-                 </div>
-               ))}
-            </div>
-         </div>
-      );
-    }
-    return (
-      <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 shadow-sm relative overflow-hidden">
-        <h3 className="text-xl font-bold text-dash-primary mb-6 flex items-center gap-2 tracking-tight">
-            <Sparkles className="w-5 h-5 text-dash-primary" /> {title}
-        </h3>
-        <div className="relative border-l border-dash-subtle ml-4 space-y-10 my-4">
-           {nodes?.map((item: any, idx: number) => (
-             <div key={idx} className="pl-8 relative">
-                 <div className="absolute w-4 h-4 bg-dash-primary rounded-full -left-[8.5px] top-1 ring-4 ring-dash-base shadow-sm" />
-                 <div className="inline-block bg-dash-surface text-dash-primary font-mono font-semibold text-xs px-3 py-1 rounded-md mb-3 border border-dash-subtle">
-                   {item.timeNode}
-                 </div>
-                 <h4 className="text-lg font-bold text-dash-primary mb-2">{item.title}</h4>
-                 <p className="text-sm text-dash-secondary leading-relaxed bg-dash-surface p-4 rounded-2xl border border-dash-subtle">
-                   {item.description}
-                 </p>
-             </div>
-           ))}
-        </div>
-      </div>
-    );
-  },
-  SystemAlert: ({ message }) => (
-    <div className="p-4 bg-dash-red/10 text-dash-red text-sm font-medium rounded-xl border border-dash-red/20 my-4 flex items-center gap-3">
-      <Activity className="w-5 h-5 shrink-0" />
-      {message}
-    </div>
-  )
-};
+import { ComponentRegistry } from './lib/sdui-registry';
 
 export interface Attachment {
   mimeType: string;
@@ -235,129 +127,15 @@ export default function App() {
     });
   };
 
-  const donutOption = useMemo(() => {
-    const arr = data.distributions?.liquidity || [];
-    return {
-      tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-      legend: { orient: 'vertical', left: 'left', textStyle: { color: '#cbd5e1' }, top: 'middle' },
-      color: ['#14b8a6', '#0ea5e9', '#3b82f6', '#0284c7', '#0369a1'],
-      series: [{
-        type: 'pie', radius: ['50%', '70%'], center: ['70%', '50%'],
-        itemStyle: { borderRadius: 6, borderColor: '#0B0C0E', borderWidth: 2 },
-        label: { show: false }, data: arr.length ? arr : [{ name: '无数据', value: 0 }]
-      }]
-    };
-  }, [data.distributions?.liquidity]);
+  const donutOption = useMemo(() => getDonutOption(data), [data?.distributions?.liquidity]);
 
-  const expenseOption = useMemo(() => {
-    const arr = data.distributions?.expenses || [];
-    return {
-      tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-      legend: { orient: 'vertical', left: 'left', textStyle: { color: '#cbd5e1' }, top: 'middle' },
-      color: ['#0d9488', '#0891b2', '#2563eb', '#1e40af', '#115e59', '#1e3a8a'],
-      series: [{
-        type: 'pie', radius: ['50%', '70%'], center: ['70%', '50%'],
-        itemStyle: { borderRadius: 6, borderColor: '#0B0C0E', borderWidth: 2 },
-        label: { show: false }, data: arr.length ? arr : [{ name: '无数据', value: 0 }]
-      }]
-    };
-  }, [data.distributions?.expenses]);
+  const expenseOption = useMemo(() => getExpenseOption(data), [data?.distributions?.expenses]);
 
-  const waterfallOption = useMemo(() => {
-    const arr = data.distributions?.privateAssets || [];
-    const names = arr.map((v: any) => v.name).concat(['总净现值']);
-    const total = arr.reduce((sum: number, v: any) => sum + v.value, 0);
+  const waterfallOption = useMemo(() => getWaterfallOption(data), [data?.distributions?.privateAssets]);
 
-    let currentSum = 0;
-    const helpData = arr.map((v: any) => { const start = currentSum; currentSum += v.value; return start; }).concat([0]);
-    const mainData = arr.map((v: any) => v.value).concat([total]);
+  const holdingsOption = useMemo(() => getHoldingsOption(data), [data?.distributions?.publicHoldings]);
 
-    return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[1].name + ' : ¥' + (p[1].value?.toLocaleString() || 0) },
-      grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
-      xAxis: { type: 'category', splitLine: { show: false }, data: names.length > 1 ? names : ['无数据'], axisLabel: { color: '#cbd5e1', interval: 0, formatter: (val: string) => val.length > 4 ? val.slice(0, 4) + '...' : val } },
-      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#334155', type: 'dashed' } }, axisLabel: { show: false } },
-      series: [
-        { type: 'bar', stack: 'Total', itemStyle: { borderColor: 'transparent', color: 'transparent' }, data: helpData },
-        {
-          type: 'bar', stack: 'Total', label: { show: true, position: 'top', formatter: (p: any) => p.value >= 10000 ? (p.value / 10000).toFixed(1) + 'w' : (p.value?.toLocaleString() || '0'), color: '#f8fafc', fontSize: 10 },
-          itemStyle: { color: (p: any) => p.dataIndex === names.length - 1 ? '#f8fafc' : '#0ea5e9', borderRadius: [4, 4, 0, 0] }, data: mainData.length ? mainData : [0]
-        }
-      ]
-    };
-  }, [data.distributions?.privateAssets]);
-
-  const holdingsOption = useMemo(() => {
-    const arr = data.distributions?.publicHoldings || [];
-    // Sort array by value to make horizontal chart look better (descending)
-    const sortedArr = [...arr].sort((a: any, b: any) => (a.value ?? a.marketValue ?? 0) - (b.value ?? b.marketValue ?? 0));
-    
-    const symbols = sortedArr.map((v: any) => v.name || v.symbol || '未知');
-    const values = sortedArr.map((v: any) => v.value ?? v.marketValue ?? 0);
-    
-    return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[0].name + ' : ¥' + (p[0].value?.toLocaleString() || 0) },
-      grid: { left: '3%', right: '15%', bottom: '5%', top: '5%', containLabel: true },
-      dataZoom: [
-        {
-          type: 'inside',
-          yAxisIndex: 0,
-          start: sortedArr.length > 8 ? Math.floor((1 - 8 / sortedArr.length) * 100) : 0, 
-          end: 100
-        },
-        {
-          type: 'slider',
-          yAxisIndex: 0,
-          show: sortedArr.length > 8,
-          width: 12,
-          right: 0,
-          borderColor: 'transparent',
-          backgroundColor: '#1e293b',
-          fillerColor: '#38BDF855',
-          handleSize: '100%',
-        }
-      ],
-      xAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#334155', type: 'dashed' } }, axisLabel: { show: false } }],
-      yAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#cbd5e1', interval: 0, width: 80, overflow: 'truncate' } }],
-      series: [{ 
-        type: 'bar', 
-        label: { show: true, position: 'right', formatter: (p: any) => p.value >= 10000 ? (p.value / 10000).toFixed(1) + 'w' : (p.value?.toLocaleString() || '0'), color: '#14b8a6', fontSize: 10 }, 
-        barWidth: '60%', 
-        data: values.length ? values : [0], 
-        itemStyle: { color: '#14b8a6', borderRadius: [0, 4, 4, 0] } 
-      }]
-    };
-  }, [data.distributions?.publicHoldings]);
-
-  const optionsOption = useMemo(() => {
-    const arr = data.distributions?.options || [];
-    const symbols = arr.map((v: any) => v.name || v.symbol || '未知');
-    const values = arr.map((v: any) => v.value ?? v.marketValue ?? 0);
-    return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[0].name + ' : ¥' + (p[0].value?.toLocaleString() || 0) },
-      grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
-      dataZoom: [
-        {
-          type: 'inside',
-          start: 0,
-          end: arr.length > 5 ? Math.floor((5 / arr.length) * 100) : 100
-        },
-        {
-          type: 'slider',
-          show: arr.length > 5,
-          height: 12,
-          bottom: 0,
-          borderColor: 'transparent',
-          backgroundColor: '#1e293b',
-          fillerColor: '#38BDF855',
-          handleSize: '100%',
-        }
-      ],
-      xAxis: [{ type: 'category', data: symbols.length ? symbols : ['无数据'], axisLabel: { color: '#cbd5e1', interval: 0, rotate: symbols.length > 4 ? 30 : 0 } }],
-      yAxis: [{ type: 'value', splitLine: { lineStyle: { color: '#334155', type: 'dashed' } }, axisLabel: { show: false } }],
-      series: [{ type: 'bar', label: { show: true, position: 'top', formatter: (p: any) => p.value >= 10000 ? (p.value / 10000).toFixed(1) + 'w' : (p.value?.toLocaleString() || '0'), color: '#0369a1', fontSize: 10 }, barWidth: '40%', data: values.length ? values : [0], itemStyle: { color: '#0369a1', borderRadius: [4, 4, 0, 0] } }]
-    };
-  }, [data.distributions?.options]);
+  const optionsOption = useMemo(() => getOptionsOption(data), [data?.distributions?.options]);
 
   const goalPercent = Math.min((data.goal?.index || 0) * 100, 100);
 
