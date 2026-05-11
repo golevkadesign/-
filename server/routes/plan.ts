@@ -6,12 +6,25 @@ const router = express.Router();
 router.post('/', async (req: Request, res: Response) => {
   const { prompt, settings, customApiKey } = req.body;
 
+  // Use custom API key if provided
+  if (customApiKey) {
+    if (!settings.geminiKey && settings.provider === 'gemini') {
+      settings.geminiKey = customApiKey;
+    } else if (!settings.openaiKey && settings.provider === 'openai') {
+      settings.openaiKey = customApiKey;
+    } else if (!settings.provider) {
+       // fallback
+       settings.geminiKey = customApiKey;
+    }
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
   try {
     const ai = getUniversalAiClient(settings);
+    
     // If a custom API key is passed and we want to allow it:
     // This is optional if your backend manages logic
     const responseStream = await ai.models.generateContentStream({

@@ -14,9 +14,9 @@ window.addEventListener('unhandledrejection', (event) => {
 
 const originalError = console.error;
 console.error = (...args) => {
-  if (typeof args[0] === 'string' && 
-     (args[0].includes('[vite] failed to connect to websocket') || 
-      args[0].includes('WebSocket closed without opened'))) {
+  const msg = args.map(a => typeof a === 'string' ? a : a?.message || '').join(' ');
+  if (msg.includes('[vite] failed to connect to websocket') || 
+      msg.includes('WebSocket closed without opened')) {
     return;
   }
   originalError.apply(console, args);

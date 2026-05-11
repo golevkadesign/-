@@ -69,7 +69,15 @@ chatRouter.post("/", async (req, res) => {
     const { message, contextData = {}, history = [], customApiKey, settings, userProfile = {}, userId, attachments = [], skipMemoryUpdate = false } = req.body;
     
     const passedSettings = settings || {};
-    if (customApiKey && !passedSettings.geminiKey) passedSettings.geminiKey = customApiKey;
+    if (customApiKey) {
+      if (!passedSettings.geminiKey && passedSettings.provider === 'gemini') {
+        passedSettings.geminiKey = customApiKey;
+      } else if (!passedSettings.openaiKey && passedSettings.provider === 'openai') {
+        passedSettings.openaiKey = customApiKey;
+      } else if (!passedSettings.provider) {
+        passedSettings.geminiKey = customApiKey;
+      }
+    }
     
     const ai = getUniversalAiClient(passedSettings);
 
