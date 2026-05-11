@@ -65,6 +65,13 @@ export const ChatList = React.memo(function ChatList({ messages, isTyping, onReg
   const [copiedIndex, setCopiedIndex] = React.useState<number | null>(null);
   const [fullScreenCode, setFullScreenCode] = React.useState<{ code: string, language: string } | null>(null);
   
+  React.useEffect(() => {
+    if (!isTyping && messages.length > 0) {
+      // 自动折叠最后一条消息的思考过程
+      setExpandedThinking(prev => ({ ...prev, [messages.length - 1]: false }));
+    }
+  }, [isTyping, messages.length]);
+
   const isAtBottomRef = React.useRef(true);
 
   const handleCopy = (text: string, index: number) => {
@@ -135,8 +142,8 @@ export const ChatList = React.memo(function ChatList({ messages, isTyping, onReg
                     <div className="flex flex-wrap gap-2 mb-3">
                         {msg.attachments.map((att: any, attIdx: number) => (
                           <div key={attIdx} className="relative shadow-sm rounded-[16px] overflow-hidden border border-white/5 bg-dash-surface">
-                              {att.mimeType.startsWith('image/') ? (
-                                <img src={`data:${att.mimeType};base64,${att.data}`} alt="attachment" className="w-20 h-20 object-cover hover:scale-105 transition-transform" />
+                              {att.mimeType?.startsWith('image/') ? (
+                                <img src={att.url || `data:${att.mimeType};base64,${att.data}`} alt="attachment" className="w-20 h-20 object-cover hover:scale-105 transition-transform" />
                               ) : (
                                 <div className="w-20 h-20 bg-white/5 flex flex-col items-center justify-center p-2 text-[10px] text-dash-secondary font-sans text-center font-medium">
                                     <FileText className="w-6 h-6 mb-1 text-dash-tertiary" />
@@ -149,9 +156,14 @@ export const ChatList = React.memo(function ChatList({ messages, isTyping, onReg
                   )}
                   {msg.content.length > 500 ? (
                       <div className="text-[15px] sm:text-[16px] leading-[1.8] break-words text-dash-primary font-medium tracking-tight">
-                        <div className={cn("whitespace-pre-wrap", expandedUserMsg[i] ? "" : "line-clamp-6")}>
-                            {msg.content}
-                        </div>
+                        <motion.div layout className="relative">
+                          <div className={cn("overflow-hidden transition-all duration-300", expandedUserMsg[i] ? "max-h-[5000px]" : "max-h-[150px]")}>
+                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                          </div>
+                          {!expandedUserMsg[i] && (
+                            <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-[#15171A] to-transparent pointer-events-none" />
+                          )}
+                        </motion.div>
                         <button 
                           onClick={() => setExpandedUserMsg(prev => ({ ...prev, [i]: !prev[i] }))} 
                           className="text-[11px] text-dash-tertiary hover:text-dash-primary mt-3 font-semibold uppercase tracking-widest w-full text-left transition-colors"
@@ -215,7 +227,7 @@ export const ChatList = React.memo(function ChatList({ messages, isTyping, onReg
                           生成中...
                         </div>
                     ) : (
-                        <div className="text-[15px] sm:text-[16px] leading-[1.8] ai-message break-words w-full space-y-4 text-dash-primary font-medium tracking-tight">
+                        <div className="text-[14px] leading-[22px] ai-message break-words w-full space-y-4 text-dash-primary" style={{ fontFamily: 'Roboto' }}>
                           <Markdown components={markdownComponents}>
                             {msg.content}
                           </Markdown>

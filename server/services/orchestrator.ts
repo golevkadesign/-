@@ -43,9 +43,20 @@ Respond MUST strictly be JSON matching this structure:
     const ai = getUniversalAiClient(settings);
     let parts: any[] = [{ text: prompt }];
     if (attachments && attachments.length > 0) {
-       attachments.forEach((att: any) => {
-          if (att.data) parts.push({ inlineData: { data: att.data, mimeType: att.mimeType } });
-       });
+       for (const att of attachments) {
+          if (att.data && att.data.length > 0) {
+              parts.push({ inlineData: { data: att.data, mimeType: att.mimeType } });
+          } else if (att.url) {
+              try {
+                  const res = await fetch(att.url);
+                  const arrayBuffer = await res.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuffer);
+                  parts.push({ inlineData: { data: buffer.toString('base64'), mimeType: att.mimeType } });
+              } catch (e) {
+                  console.error("Failed to fetch attachment from URL:", e);
+              }
+          }
+       }
     }
 
     const response = await ai.models.generateContent({

@@ -79,21 +79,45 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
        localStorage.setItem(`ai_terminal_chat_${user.uid}`, JSON.stringify(chatHistory));
        const timeoutId = setTimeout(() => {
            // Prevent Firestore 1MB document size limit by stripping very large attachments and truncating thinking logs
-           const chatToSync = chatHistory.map(c => {
-               const newC = { ...c };
-               if (newC.thinking) {
-                   newC.thinking = newC.thinking.substring(0, 5000) + (newC.thinking.length > 5000 ? '\n...[truncated]' : '');
-               }
-               newC.attachments = newC.attachments?.map(att => ({
-                    ...att,
-                    // If attachment is larger than 100KB, remove its raw data from persistent storage to save space, keeping just metadata
-                    data: att.data.length > 100000 ? "" : att.data,
-                    isTruncated: att.data.length > 100000
-               })) || [];
-               Object.keys(newC).forEach(key => (newC as any)[key] === undefined && delete (newC as any)[key]);
-               return newC;
-           });
-           setDoc(doc(db, "userProfiles", user.uid), { chatHistory: chatToSync }, { merge: true }).catch(e => console.error("Failed to save chat to firestore:", e));
+           (async () => {
+             const { storage } = await import('../lib/firebase');
+             const { ref, uploadString, getDownloadURL } = await import('firebase/storage');
+             
+             const chatToSync = await Promise.all(chatHistory.map(async c => {
+                 const newC = { ...c };
+                 if (newC.thinking) {
+                     newC.thinking = newC.thinking.substring(0, 5000) + (newC.thinking.length > 5000 ? '\n...[truncated]' : '');
+                 }
+                 newC.attachments = await Promise.all(newC.attachments?.map(async att => {
+                      const newAtt = { ...att };
+                      // If attachment is larger than 100KB, remove its raw data from persistent storage to save space, keeping just metadata
+                      if (newAtt.data && newAtt.data.length > 100000) {
+                          if (!newAtt.url) {
+                              try {
+                                  const storageRef = ref(storage, `chat_attachments/${user.uid}/${Date.now()}_${Math.random().toString(36).substring(7)}`);
+                                  await uploadString(storageRef, newAtt.data, 'base64', { contentType: newAtt.mimeType });
+                                  newAtt.url = await getDownloadURL(storageRef);
+                              } catch (e) {
+                                  console.error("Storage upload failed", e);
+                              }
+                          }
+                          newAtt.data = "";
+                          newAtt.isTruncated = true;
+                      }
+                      return newAtt;
+                 }) || []);
+                 Object.keys(newC).forEach(key => (newC as any)[key] === undefined && delete (newC as any)[key]);
+                 return newC;
+             }));
+             
+             try {
+                const { doc, setDoc } = await import('firebase/firestore');
+                const { db } = await import('../lib/firebase');
+                await setDoc(doc(db, "userProfiles", user.uid), { chatHistory: chatToSync }, { merge: true });
+             } catch(e) {
+                console.error("Failed to save chat to firestore:", e);
+             }
+           })();
        }, 2000);
        return () => clearTimeout(timeoutId);
     }
@@ -123,7 +147,28 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
   const handleAiSubmit = async (overrideMsg?: string, overrideAtts?: Attachment[]) => {
     const startTime = Date.now();
     const actualMsg = typeof overrideMsg === 'string' ? overrideMsg : inputMsg;
-    const attsToSend = overrideAtts || [...attachments];
+    
+    let attsToSend = overrideAtts || [...attachments];
+
+    // Upload large attachments to Firebase Storage before sending
+    if (user?.uid) {
+        attsToSend = await Promise.all(attsToSend.map(async (att) => {
+            if (att.data && att.data.length > 50000 && !att.url) {
+                try {
+                    const { storage } = await import('../lib/firebase');
+                    const { ref, uploadString, getDownloadURL } = await import('firebase/storage');
+                    const storageRef = ref(storage, `chat_attachments/${user.uid}/${Date.now()}_${Math.random().toString(36).substring(7)}`);
+                    await uploadString(storageRef, att.data, 'base64', { contentType: att.mimeType });
+                    const url = await getDownloadURL(storageRef);
+                    return { ...att, url, data: '', isTruncated: true };
+                } catch (e) {
+                    console.error("Storage upload failed pre-send", e);
+                    return att;
+                }
+            }
+            return att;
+        }));
+    }
 
     if (!actualMsg.trim() && attsToSend.length === 0) return;
 
@@ -368,7 +413,8 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
                 if (parsed.error?.message) errMsg = parsed.error.message;
             } catch {}
         }
-        newHist[newHist.length - 1].ai = `⚠️ **通信中断**: ${errMsg}`;
+        const currentAiText = newHist[newHist.length - 1].ai || '';
+        newHist[newHist.length - 1].ai = currentAiText + (currentAiText ? '\n\n' : '') + `⚠️ **通信中断**: ${errMsg}`;
         return newHist;
       });
     } finally {
