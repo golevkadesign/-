@@ -61,6 +61,16 @@ export default function App() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
+    const isTestMode = new URLSearchParams(window.location.search).get('test') === '1';
+    
+    if (isTestMode) {
+       const dummyUser = { uid: 'test-user', displayName: 'Test User' };
+       setUser(dummyUser);
+       setData(EMPTY_STATE);
+       setLoadingAuth(false);
+       return;
+    }
+
     const unsubscribe = subscribeToAuthChanges(async (u) => {
       setUser(u);
       if (u) {
