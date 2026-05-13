@@ -213,6 +213,7 @@ export default function App() {
       const decoder = new TextDecoder('utf-8');
       let accumulatedText = '';
       let buffer = '';
+      let lastUpdateTime = 0; // 引入节流阀时间戳
       
       while (true) {
         const { done, value } = await reader.read();
@@ -222,6 +223,8 @@ export default function App() {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
         
+        let hasUpdates = false;
+
         for (const line of lines) {
           if (line.startsWith('data: ') && line !== 'data: [DONE]') {
             try {
@@ -229,37 +232,48 @@ export default function App() {
               if (parsed.error) throw new Error(parsed.error);
               if (parsed.text) {
                 accumulatedText += parsed.text;
-        
-        let thinkMatch = accumulatedText.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
-        let currentThinkLine = '建立深度推演图谱...';
-        
-        if (thinkMatch) {
-            const thinkContent = thinkMatch[1].trim();
-            const lines = thinkContent.split('\n').filter(l => l.trim().length > 0);
-            if (lines.length > 0) {
-               let lastLine = lines[lines.length - 1].replace(/[*#`]/g, '').trim();
-               if (lastLine.length > 40) lastLine = lastLine.substring(0, 40) + '...';
-               currentThinkLine = lastLine;
-            }
-        }
-        
-        const resText = accumulatedText.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim();
-
-        setNodePlans(prev => ({
-          ...prev,
-          [planKey]: { status: 'thinking', result: resText, thinking: currentThinkLine }
-        }));
+                hasUpdates = true;
               }
             } catch (e) {
               // Ignore partial JSON parsing errors
             }
           }
         }
+
+        // 核心修复：节流渲染 (Throttling)
+        // 将 setNodePlans 移出 for 循环，并且限制至少间隔 60 毫秒才触发一次 React 重绘
+        const now = Date.now();
+        if (hasUpdates && now - lastUpdateTime > 60) {
+            let thinkMatch = accumulatedText.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
+            let currentThinkLine = '建立深度推演图谱...';
+            
+            if (thinkMatch) {
+                const thinkContent = thinkMatch[1].trim();
+                const thinkLines = thinkContent.split('\n').filter(l => l.trim().length > 0);
+                if (thinkLines.length > 0) {
+                   let lastLine = thinkLines[thinkLines.length - 1].replace(/[*#`]/g, '').trim();
+                   if (lastLine.length > 40) lastLine = lastLine.substring(0, 40) + '...';
+                   currentThinkLine = lastLine;
+                }
+            }
+            
+            const resText = accumulatedText.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim();
+
+            setNodePlans(prev => ({
+              ...prev,
+              [planKey]: { status: 'thinking', result: resText, thinking: currentThinkLine }
+            }));
+            
+            lastUpdateTime = now; // 重置节流阀
+        }
       }
 
+      // 确保流结束后，进行最后一次完整的高精度数据托底渲染
+      let finalThinkMatch = accumulatedText.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
+      const finalResText = accumulatedText.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim();
       setNodePlans(prev => ({
         ...prev,
-        [planKey]: { ...prev[planKey], status: 'done' }
+        [planKey]: { status: 'done', result: finalResText, thinking: '推演执行完毕' }
       }));
 
     } catch (e: any) {

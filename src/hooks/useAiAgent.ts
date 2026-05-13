@@ -283,10 +283,15 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
                    } else if (parsed.type === 'summary_chunk') {
                       streamedAi += parsed.text;
                       let displayText = streamedAi;
+                      
+                      // 动态侦测 JSON 块边界
                       const jsonMatch = streamedAi.indexOf('```json');
                       if (jsonMatch !== -1) {
-                         displayText = streamedAi.substring(0, jsonMatch).trim();
+                         const textBefore = streamedAi.substring(0, jsonMatch).trim();
+                         // 核心修复 1：如果大模型跳过文本直接吐 JSON，不要展示空白，给用户明确的加载感知
+                         displayText = textBefore || "> ⚙️ 正在编译底层终端状态树 (JSON Payload)... 稍候...";
                       }
+                      
                       setChatHistory(prev => {
                          const newHist = [...prev];
                          newHist[newHist.length - 1].ai = displayText;
@@ -321,7 +326,6 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
       
       // 1.6 Eagerly merge Live Portfolio to bypass AI latency and ensure badge
       if (bffData.externalData?.livePortfolio && bffData.externalData.livePortfolio.length > 0) {
-          // Merge it early so it renders instantly
           commitData((prevData: any) => ({
               ...prevData,
               distributions: {
@@ -332,7 +336,6 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
           }));
       }
 
-      // If it's a quick reply, short circuit
       if (bffData.isQuickReply) {
          setChatHistory(prev => {
            const newHist = [...prev];
@@ -343,23 +346,29 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
          return;
       }
       
-      // 3. 全量 JSON 解析 (仅在收到最终 result 后执行)
+      // 3. 全量 JSON 解析 (核心修复 2：极度鲁棒的正则引擎与优雅降级)
       const txt = streamedAi || bffData.expertAnalysis?.['综合统筹结论'] || "";
 
       let sduiPayload: any = null;
+
       try {
-        let cleanedTxt = txt;
-        const jsonMatch = txt.match(/```(?:json)?\n([\s\S]*?)\n```/);
-        if (jsonMatch && jsonMatch[1]) {
-           cleanedTxt = jsonMatch[1];
-        } else {
-           cleanedTxt = txt.replace(/```(?:json)?\n?/gi, '').replace(/```\n?/g, '').trim();
+        // 策略：匹配所有的代码块，强制提取最后一个（因为 AI 的 JSON Patch 必定在最后）
+        const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+        let lastMatchedJson = null;
+        let match;
+        while ((match = jsonBlockRegex.exec(txt)) !== null) {
+            lastMatchedJson = match[1];
         }
-        
-        const startIdx = cleanedTxt.indexOf('{');
-        const endIdx = cleanedTxt.lastIndexOf('}');
+
+        let rawPayload = txt;
+        if (lastMatchedJson) {
+            rawPayload = lastMatchedJson;
+        }
+
+        const startIdx = rawPayload.indexOf('{');
+        const endIdx = rawPayload.lastIndexOf('}');
         if (startIdx !== -1 && endIdx !== -1) {
-           sduiPayload = JSON.parse(cleanedTxt.substring(startIdx, endIdx + 1));
+            sduiPayload = JSON.parse(rawPayload.substring(startIdx, endIdx + 1));
         }
       } catch(e) { 
         console.error("Parse SDUI error:", e); 
@@ -368,7 +377,7 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
       setChatHistory(prev => {
         const newHist = [...prev];
         const displayAi = txt.substring(0, txt.indexOf('```json') !== -1 ? txt.indexOf('```json') : txt.length).trim();
-        newHist[newHist.length - 1].ai = displayAi || (sduiPayload ? "SDUI 状态已更新" : `JSON 解析失败: \n${txt}`);
+        newHist[newHist.length - 1].ai = displayAi || (sduiPayload ? "> ⚙️ 高级视图数据已同步至终端..." : txt);
         return newHist;
       });
 
