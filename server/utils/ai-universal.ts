@@ -77,26 +77,29 @@ async function fetchOpenAI(apiKey: string, model: string, messages: any[], tempe
 export const getUniversalAiClient = (passedSettings?: any) => {
   const getS = () => passedSettings || {};
 
-  const retryOperation = async (operation: () => Promise<any>, maxRetries = 2, baseDelay = 500) => {
+  const retryOperation = async (operation: () => Promise<any>, maxRetries = 3, baseDelay = 1000) => {
     let attempt = 0;
     while (true) {
       try {
-        const result = await operation();
-        return result;
+        return await operation();
       } catch (error: any) {
         attempt++;
         const errMessage = error?.message || String(error);
         const errStatus = error?.status || error?.code || (error?.response?.status);
         const errJsonString = JSON.stringify(error) || '';
-        const isTransient = errMessage.includes('503') || errMessage.includes('UNAVAILABLE') || errMessage.includes('fetch failed') || errMessage.includes('ECONNRESET') || errMessage.includes('HeadersTimeoutError') || errMessage.includes('overloaded') || errMessage.includes('temporarily down') || errStatus === 503 || errStatus === 'UNAVAILABLE' || errJsonString.includes('503') || errJsonString.includes('UNAVAILABLE') || errStatus === 500 || errMessage.includes('500');
         
-        if (!isTransient || attempt >= maxRetries) {
-          throw error;
+        // 识别是否是可恢复的瞬时错误 (503 拥挤, 网路重置等)
+        const isTransient = errMessage.includes('503') || errMessage.includes('UNAVAILABLE') || 
+                            errMessage.includes('fetch failed') || errMessage.includes('ECONNRESET') || 
+                            errStatus === 503 || errStatus === 'UNAVAILABLE' || errJsonString.includes('503');
+        
+        if (!isTransient || attempt > maxRetries) {
+          throw error; // 额度耗尽(429)或非瞬时错误，或超限，立刻向上抛出交由降级策略处理
         }
         
-        // Short fixed delay, without exponential backoff
-        const delay = baseDelay;
-        console.log(`[AI Retry] Transient error encountered, retrying (${attempt}/${maxRetries}) in ${delay}ms...`, errMessage);
+        // 核心修复：指数退避 (1s, 2s, 4s...) + 随机抖动 (防止并发请求同时再次重试)
+        const delay = baseDelay * Math.pow(2, attempt - 1) + (Math.random() * 500);
+        console.log(`[AI Retry] 模型处于高负载 (503)，退避重试 (${attempt}/${maxRetries}) 延时 ${Math.round(delay)}ms...`);
         await new Promise(res => setTimeout(res, delay));
       }
     }
@@ -143,8 +146,12 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           const ai = new GoogleGenAI({ apiKey });
 
           let overrideConfig = { ...config };
+          const maxR = overrideConfig.maxRetries !== undefined ? overrideConfig.maxRetries : undefined;
+          const baseD = overrideConfig.baseDelay !== undefined ? overrideConfig.baseDelay : undefined;
+          delete overrideConfig.maxRetries;
+          delete overrideConfig.baseDelay;
           
-          return retryOperation(() => ai.models.generateContentStream({ model: targetModel, contents, config: overrideConfig }));
+          return retryOperation(() => ai.models.generateContentStream({ model: targetModel, contents, config: overrideConfig }), maxR, baseD);
         }
       },
       generateContent: async ({ model, contents, config }: any) => {
@@ -185,8 +192,12 @@ export const getUniversalAiClient = (passedSettings?: any) => {
           const ai = new GoogleGenAI({ apiKey });
           
           let overrideConfig = { ...config };
+          const maxR = overrideConfig.maxRetries !== undefined ? overrideConfig.maxRetries : undefined;
+          const baseD = overrideConfig.baseDelay !== undefined ? overrideConfig.baseDelay : undefined;
+          delete overrideConfig.maxRetries;
+          delete overrideConfig.baseDelay;
           
-          return retryOperation(() => ai.models.generateContent({ model: targetModel, contents, config: overrideConfig }));
+          return retryOperation(() => ai.models.generateContent({ model: targetModel, contents, config: overrideConfig }), maxR, baseD);
         }
       }
     }

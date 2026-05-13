@@ -253,16 +253,19 @@ ${JSON.stringify({
     + "\n" + uiSummaryInstructions;
 
   try {
+    // 优先尝试 Pro 模型，但通过 config 覆盖其底层重试机制，使其“只试错1次”，失败立刻跳出！
     const responseStream = await ai.models.generateContentStream({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-3.1-pro-preview", // 注意：如果你有配置，最好用 gemini-2.5-pro 替代这个可能不存在的预览版
       contents: summaryPrompt,
-      config: { temperature: 0.1 }
+      config: { temperature: 0.1, maxRetries: 1, baseDelay: 300 }
     });
     return responseStream;
   } catch (e: any) {
-    console.error("Synthesizer pro model error, falling back to flash:", e);
-    if (onProgress) onProgress(`⚠️ [阶段 3.9] Pro模型高负载，降级至Flash模型进行全局汇总...`);
+    console.warn("[降级保护] Pro模型高负载或无响应，毫秒级无缝降级至 Flash 模型...");
+    if (onProgress) onProgress(`⚡ [系统提示] 主力模型当前拥挤，已启动闪电节点(Flash)接管输出...`);
+    
     try {
+        // 无缝切回高并发 Flash 模型
         const responseStream = await ai.models.generateContentStream({
           model: settings?.geminiFastModel || "gemini-2.5-flash",
           contents: summaryPrompt,
@@ -271,7 +274,7 @@ ${JSON.stringify({
         return responseStream;
     } catch (e2: any) {
         console.error("Synthesizer flash model error:", e2);
-        throw e2;
+        throw e2; // 如果 Flash 也挂了，才真正抛出给外层
     }
   }
 }

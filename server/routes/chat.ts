@@ -188,7 +188,6 @@ chatRouter.post("/", async (req, res) => {
         const synthesisStream = await streamSynthesis(userTier, processedMessage, aggregatedData, expertAnalysis, passedSettings, sendProgress);
         
         let synthesizedText = "";
-        console.log("synthesisStream response structure:", synthesisStream);
         for await (const chunk of synthesisStream) {
             if (requestAborted) break;
             let textChunk = "";
@@ -201,18 +200,27 @@ chatRouter.post("/", async (req, res) => {
             }
             if (!textChunk) continue;
             synthesizedText += textChunk;
+            
+            // 保持正常推流
             res.write(`data: ${JSON.stringify({ type: 'summary_chunk', text: textChunk })}\n\n`);
             if ('flush' in res && typeof (res as any).flush === 'function') {
                 (res as any).flush();
             }
         }
         
-        // After streaming is done, attach the completed summary into the expertAnalysis
         expertAnalysis['综合统筹结论'] = synthesizedText;
         sendProgress("✅ [阶段 3.9] 终端总结流式输出完成！");
-    } catch (syntaxError: any) {
-        console.error("Syntax streams error", syntaxError.stack || syntaxError);
-        sendProgress(`⚠️ 总结流式输出异常: ${syntaxError.message}`);
+
+    } catch (streamError: any) {
+        // 关键修复：如果在推流途中网络断裂或服务器 503 崩溃
+        console.error("流式读取被强制阻断:", streamError.stack || streamError);
+        
+        // 不要抛出异常！而是向前端推送一条“优雅的终端提示”并结束流
+        const fallbackText = "\n\n> ⚠️ **数据流中断**：由于当前 AI 推理集群需求激增（503），流式输出被截断。上方为已生成的安全结论，您可稍后点击重试重新生成完整报告。";
+        res.write(`data: ${JSON.stringify({ type: 'summary_chunk', text: fallbackText })}\n\n`);
+        
+        // 记录已生成的部分，防止全盘丢失
+        expertAnalysis['综合统筹结论'] = (expertAnalysis['综合统筹结论'] || '') + fallbackText;
     }
 
     sendProgress("✅ [阶段 4] 本地推流阻断释放，将 Agent 数据全阵列推送回客户端。");
