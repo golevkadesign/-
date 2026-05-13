@@ -9,7 +9,9 @@ export interface UserProfile {
 
 export interface Metrics {
   netWorth: number;
+  netWorthSummary?: string;
   liquidity: number;
+  liquiditySummary?: string;
   safetyRatio: number;
   safetyRatioSummary: string;
   fcf: number;
@@ -45,6 +47,12 @@ export interface Goal {
 export interface Insights {
   global: string;
   private: string;
+  liquidity?: string;
+  publicText?: string;
+  publicSummary?: string;
+  options?: string;
+  fixedAssets?: string;
+  expenses?: string;
   public?: any;
 }
 

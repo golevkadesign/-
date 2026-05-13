@@ -24,6 +24,8 @@ export interface Attachment {
   mimeType: string;
   data: string;
   name: string;
+  url?: string;
+  isTruncated?: boolean;
 }
 
 const formatMoney = (val: number | undefined | null) =>
@@ -107,7 +109,7 @@ export default function App() {
       
       commitData(EMPTY_STATE);
       setSduiState([]);
-      setNodePlans({});
+      clearNodePlans();
       setShowClearConfirm(false);
       window.dispatchEvent(new Event('clear-chat-history'));
     }

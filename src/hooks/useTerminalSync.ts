@@ -95,8 +95,23 @@ export function useTerminalSync() {
     setData((prev: TerminalState) => {
       const rawNewData = typeof newDataOrUpdater === 'function' ? newDataOrUpdater(prev) : newDataOrUpdater;
       const newData = sanitizeTerminalState(rawNewData) as TerminalState;
+      
+      const mergedMetrics = { ...prev.metrics, ...rawNewData.metrics, ...newData.metrics };
+      const mergedDistributions = { ...prev.distributions, ...rawNewData.distributions, ...newData.distributions };
+      const mergedInsights = { ...prev.insights, ...rawNewData.insights, ...newData.insights };
+      const mergedGoal = { ...prev.goal, ...rawNewData.goal, ...newData.goal };
+      
       // ensure we don't drop fields not processed by sanitizer but merged from old states
-      const fullData = { ...rawNewData, ...newData };
+      const fullData = { 
+          ...prev, 
+          ...rawNewData, 
+          ...newData,
+          metrics: mergedMetrics,
+          distributions: mergedDistributions,
+          insights: mergedInsights,
+          goal: mergedGoal
+      };
+      
       if (user?.uid) {
           localStorage.setItem(`ai_terminal_data_${user.uid}`, JSON.stringify(fullData));
           const appDataToSave = { ...fullData };
