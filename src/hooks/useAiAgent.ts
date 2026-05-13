@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { getDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getSettings } from '../lib/settings';
+import { sanitizeTerminalState } from '../lib/sanitizer';
 import { Attachment } from '../App';
 
 export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesizing }: any) {
@@ -386,18 +387,21 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
       }
       
       if (sduiPayload?.updateGlobalState) {
+         // Sanitize AI's raw update payload BEFORE merging, removing nulls/bad types but keeping omitted fields untouched
+         const sanitizedUpdate = sanitizeTerminalState(sduiPayload.updateGlobalState);
+
          commitData((prevData: any) => ({ 
             ...prevData, 
-            ...sduiPayload.updateGlobalState, 
-            metrics: { ...prevData.metrics, ...(sduiPayload.updateGlobalState.metrics || {}) },
+            ...sanitizedUpdate, 
+            metrics: { ...prevData.metrics, ...(sanitizedUpdate.metrics || {}) },
             distributions: { 
                 ...prevData.distributions, 
-                ...(sduiPayload.updateGlobalState.distributions || {}),
+                ...(sanitizedUpdate.distributions || {}),
                 // Ensure AI doesn't accidentally overwrite deterministic live portfolio
                 ...(bffData.externalData?.livePortfolio ? { publicHoldings: bffData.externalData.livePortfolio } : {})
             },
-            insights: { ...prevData.insights, ...(sduiPayload.updateGlobalState.insights || {}) },
-            goal: sduiPayload.updateGlobalState.goal || prevData.goal,
+            insights: { ...prevData.insights, ...(sanitizedUpdate.insights || {}) },
+            goal: sanitizedUpdate.goal || prevData.goal,
             _liveSources: bffData.externalData?.livePortfolio ? ['longbridge'] : []
          }));
       }
