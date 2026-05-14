@@ -21,6 +21,9 @@ import Markdown from 'react-markdown';
 import { ChartWidget } from './components/ChartWidget';
 import { ProfileReportView } from './components/ProfileReportView';
 import { WidgetCopilot } from './components/WidgetCopilot';
+import { TerminalHeader } from './components/TerminalHeader';
+import { LifeStrategyTimeline } from './components/LifeStrategyTimeline';
+import { GoalTracker } from './components/GoalTracker';
 
 import { ComponentRegistry, SDUIRenderer } from './lib/sdui-registry';
 
@@ -60,8 +63,6 @@ export default function App() {
   const holdingsOption = useMemo(() => getHoldingsOption(data), [data?.distributions?.publicHoldings]);
 
   const optionsOption = useMemo(() => getOptionsOption(data), [data?.distributions?.options]);
-
-  const goalPercent = Math.min((data.goal?.index || 0) * 100, 100);
 
   if (loadingAuth) {
     return <div className="min-h-screen flex items-center justify-center bg-dash-bg text-dash-primary font-mono tracking-widest text-[13px] uppercase font-semibold">Initializing Security Context...</div>;
@@ -135,82 +136,13 @@ export default function App() {
 
       {/* Top Header */}
 
-      <header className="sticky top-0 z-40 bg-dash-bg/80 backdrop-blur-xl border-b border-dash-subtle mb-6 md:mb-8 transition-all">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 md:h-20 flex justify-between items-center">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="bg-dash-surface border border-dash-subtle shadow-inner w-10 h-10 sm:w-12 sm:h-12 rounded-[14px] flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-dash-primary/20 to-transparent opacity-20"></div>
-              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-dash-primary shadow-[0_0_10px_rgba(255,255,255,0.3)]"></div>
-            </div>
-            <div className="truncate flex flex-col justify-center">
-              <h1 className="text-xl sm:text-2xl font-sans font-medium tracking-tight text-dash-primary leading-none">
-                Arbitra <span className="text-dash-tertiary">Terminal</span>
-              </h1>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3 sm:gap-4 lg:gap-6">
-            <button
-              onClick={() => setShowProfileReport(true)}
-              className="flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-dash-surface border border-dash-subtle text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover transition-colors font-mono text-[10px] sm:text-xs uppercase tracking-widest font-semibold shadow-sm"
-              title="长线记忆 / Memory Profile"
-            >
-              <Database className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Memory</span>
-            </button>
-
-            <button
-              onClick={() => setShowDeveloperView(true)}
-              className="flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-dash-surface border border-dash-subtle text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover transition-colors font-mono text-[10px] sm:text-xs uppercase tracking-widest font-semibold shadow-sm"
-              title="开发者视图 / Developer View"
-            >
-              <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Developer</span>
-            </button>
-
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setDrawerOpen(true)} 
-              className="hidden md:flex items-center gap-2 px-6 py-2.5 rounded-[12px] text-[13px] font-bold bg-dash-primary text-dash-base hover:bg-white transition-colors shadow-sm"
-            >
-              <Sparkles className="w-4 h-4" /> Initialize
-            </motion.button>
-
-            {/* Mobile simplified AI button */}
-            <motion.button 
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setDrawerOpen(true)} 
-              className="flex md:hidden items-center justify-center w-10 h-10 rounded-[12px] bg-dash-primary text-dash-base hover:bg-white transition-colors shadow-sm"
-            >
-              <Sparkles className="w-5 h-5" />
-            </motion.button>
-
-            <div className="h-6 md:h-8 w-px bg-dash-subtle mx-1"></div>
-
-            <div className="flex items-center gap-3 group relative cursor-pointer">
-               <div className="w-10 h-10 rounded-[12px] bg-dash-surface-hover border border-dash-subtle hover:border-dash-primary/30 flex items-center justify-center overflow-hidden shrink-0 transition-colors shadow-sm">
-                 <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
-               </div>
-               <div className="absolute right-0 top-12 scale-0 group-hover:scale-100 origin-top-right transition-all duration-200 bg-dash-surface border border-dash-subtle rounded-2xl p-2 shadow-xl z-50 w-56 backdrop-blur-xl">
-                  <div className="px-3 py-3 border-b border-dash-subtle mb-2">
-                    <p className="text-[13px] font-bold text-dash-primary truncate">{user.displayName}</p>
-                    <p className="text-[11px] font-mono tracking-wide text-dash-tertiary truncate">{user.email}</p>
-                  </div>
-                  <button onClick={() => setShowProfileReport(true)} className="w-full flex items-center gap-2 text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover p-2.5 rounded-xl text-xs font-semibold transition-colors mb-1 uppercase tracking-wide">
-                    <User className="w-4 h-4" /> 长线记忆
-                  </button>
-                  <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-2 text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover p-2.5 rounded-xl text-xs font-semibold transition-colors mb-1 uppercase tracking-wide">
-                    <Settings className="w-4 h-4" /> Settings
-                  </button>
-                  <button onClick={logout} className="w-full flex items-center gap-2 text-dash-textSub hover:bg-dash-red/10 text-dash-secondary hover:text-dash-red p-2.5 rounded-xl text-xs font-semibold transition-colors uppercase tracking-wide">
-                    <LogOut className="w-4 h-4" /> Disconnect
-                  </button>
-               </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <TerminalHeader 
+        user={user}
+        setShowProfileReport={setShowProfileReport}
+        setShowDeveloperView={setShowDeveloperView}
+        setDrawerOpen={setDrawerOpen}
+        setShowSettingsModal={setShowSettingsModal}
+      />
       
       <main className="max-w-[1600px] mx-auto px-4 md:px-6">
         {/* Top Feature: AI Strategic Overview */}
@@ -388,155 +320,16 @@ export default function App() {
       </div>
 
       {/* 阶段性人生策略建议 (Life Strategies Timeline) */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">
-         {/* 短线 */}
-         <motion.div 
-           initial={{ opacity: 0, y: 10 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ type: "spring", stiffness: 400, damping: 25, staggerChildren: 0.1 }}
-           className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 relative overflow-hidden group shadow-sm transition-colors hover:bg-dash-surface-hover"
-         >
-           <h3 className="text-[11px] font-semibold text-dash-secondary mb-8 flex items-center gap-2 uppercase tracking-[0.1em] block w-full">
-             Short-Term Strategy <span className="text-dash-tertiary ml-auto">12 Months</span>
-           </h3>
-           {(!data.lifeStrategiesShort || data.lifeStrategiesShort.length === 0) ? (
-              <div className="text-dash-tertiary text-[11px] flex items-center justify-center h-24 border border-dash-subtle rounded-2xl bg-dash-surface-hover font-semibold uppercase tracking-widest">No Data</div>
-           ) : (
-              <div className="relative border-l border-dash-subtle ml-4 space-y-12 my-4">
-                {data.lifeStrategiesShort.map((item: any, idx: number) => {
-                   const contentStr = encodeURIComponent(item.description || item.title || '');
-                   const contentHash = btoa(contentStr).slice(0, 15);
-                   const planKey = `short-${idx}-${contentHash}`;
-                   const plan = nodePlans[planKey];
-                   return (
-                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ type: "spring", stiffness: 400, damping: 25, delay: idx * 0.1 }} key={idx} className="pl-6 sm:pl-8 relative group/item">
-                      <div className="absolute w-3 h-3 bg-dash-primary rounded-full -left-[6.5px] top-2 ring-4 ring-dash-base shadow-sm" />
-                      <div className="inline-block bg-dash-surface-hover text-dash-primary font-mono text-[10px] sm:text-xs px-3 py-1.5 rounded-lg mb-3 tracking-wide border border-dash-subtle tabular-nums font-semibold">
-                        {item.timeNode}
-                      </div>
-                      <div className="flex justify-between items-start mb-3 gap-2">
-                         <h4 className="text-[15px] sm:text-lg font-semibold text-dash-primary leading-tight tracking-tight pr-0">{item.title}</h4>
-                         <button 
-                           onClick={() => plan?.status === 'thinking' ? null : handleInlineNodePlan('短线策略', item, false, idx)}
-                           disabled={plan?.status === 'thinking'}
-                           className="shrink-0 text-[10px] uppercase font-semibold border border-dash-subtle hover:border-dash-primary bg-dash-surface-hover hover:bg-white text-dash-primary hover:text-dash-base px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed tracking-widest shadow-sm"
-                         >
-                           {plan?.status === 'thinking' ? <Loader2 className="w-3 h-3 animate-spin" /> : (plan?.status === 'done' ? <RefreshCw className="w-3 h-3" /> : <Activity className="w-3 h-3"/> )}
-                           {plan?.status === 'thinking' ? 'Wait' : (plan?.status === 'done' ? 'Retry' : 'Analyze')}
-                         </button>
-                      </div>
-                      <p className="text-[13px] text-dash-secondary leading-relaxed p-4 rounded-2xl border border-dash-subtle bg-dash-surface-hover">
-                        {item.description}
-                      </p>
-                      {plan && (
-                         <div className="mt-4 bg-dash-base border border-dash-subtle rounded-2xl overflow-hidden text-xs sm:text-sm shadow-inner">
-                            {plan.status === 'thinking' && (
-                               <div className="flex items-center gap-2 px-4 py-3 text-dash-primary font-semibold tracking-wide text-[10px] sm:text-xs border-b border-dash-subtle bg-dash-surface-hover">
-                                  <Cpu className="w-3.5 h-3.5 animate-pulse shrink-0" />
-                                  <span className="truncate">{plan.thinking || 'Connecting...'}</span>
-                               </div>
-                            )}
-                            {plan.result && (
-                               <div className="p-4 sm:p-5 text-dash-primary markdown-body leading-relaxed text-[13px]">
-                                  <Markdown>{plan.result}</Markdown>
-                               </div>
-                            )}
-                         </div>
-                      )}
-                   </motion.div>
-                )})}
-              </div>
-           )}
-         </motion.div>
-
-         {/* 长线 */}
-         <motion.div 
-           initial={{ opacity: 0, y: 10 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ type: "spring", stiffness: 400, damping: 25, staggerChildren: 0.1, delay: 0.2 }}
-           className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 relative overflow-hidden group shadow-sm transition-colors hover:bg-dash-surface-hover"
-         >
-           <h3 className="text-[11px] font-semibold text-dash-secondary mb-8 flex items-center gap-2 uppercase tracking-[0.1em] block w-full">
-             Long-Term Strategy <span className="text-dash-tertiary ml-auto">10+ Years</span>
-           </h3>
-           {(!data.lifeStrategiesLong || data.lifeStrategiesLong.length === 0) ? (
-              <div className="text-dash-tertiary text-[11px] flex items-center justify-center h-24 border border-dash-subtle rounded-2xl bg-dash-surface-hover font-semibold uppercase tracking-widest">No Data</div>
-           ) : (
-              <div className="relative border-l border-dash-subtle ml-4 space-y-12 my-4">
-                {data.lifeStrategiesLong.map((item: any, idx: number) => {
-                   const contentStr = encodeURIComponent(item.description || item.title || '');
-                   const contentHash = btoa(contentStr).slice(0, 15);
-                   const planKey = `long-${idx}-${contentHash}`;
-                   const plan = nodePlans[planKey];
-                   return (
-                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ type: "spring", stiffness: 400, damping: 25, delay: idx * 0.1 }} key={idx} className="pl-6 sm:pl-8 relative group/item">
-                      <div className="absolute w-3 h-3 bg-dash-primary rounded-full -left-[6.5px] top-2 ring-4 ring-dash-base shadow-sm" />
-                      <div className="inline-block bg-dash-surface-hover text-dash-primary font-mono text-[10px] sm:text-xs px-3 py-1.5 rounded-lg mb-3 tracking-wide border border-dash-subtle tabular-nums font-semibold">
-                        {item.timeNode}
-                      </div>
-                      <div className="flex justify-between items-start mb-3 gap-2">
-                         <h4 className="text-[15px] sm:text-lg font-semibold text-dash-primary leading-tight tracking-tight pr-0">{item.title}</h4>
-                         <button 
-                           onClick={() => plan?.status === 'thinking' ? null : handleInlineNodePlan('长线策略', item, true, idx)}
-                           disabled={plan?.status === 'thinking'}
-                           className="shrink-0 text-[10px] uppercase font-semibold border border-dash-subtle hover:border-dash-primary bg-dash-surface-hover hover:bg-white text-dash-primary hover:text-dash-base px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed tracking-widest shadow-sm"
-                         >
-                           {plan?.status === 'thinking' ? <Loader2 className="w-3 h-3 animate-spin" /> : (plan?.status === 'done' ? <RefreshCw className="w-3 h-3" /> : <Activity className="w-3 h-3"/> )}
-                           {plan?.status === 'thinking' ? 'Wait' : (plan?.status === 'done' ? 'Retry' : 'Analyze')}
-                         </button>
-                      </div>
-                      <p className="text-[13px] text-dash-secondary leading-relaxed p-4 rounded-2xl border border-dash-subtle bg-dash-surface-hover">
-                        {item.description}
-                      </p>
-                      {plan && (
-                         <div className="mt-4 bg-dash-base border border-dash-subtle rounded-2xl overflow-hidden text-xs sm:text-sm shadow-inner">
-                            {plan.status === 'thinking' && (
-                               <div className="flex items-center gap-2 px-4 py-3 text-dash-primary font-semibold tracking-wide text-[10px] sm:text-xs border-b border-dash-subtle bg-dash-surface-hover">
-                                  <Cpu className="w-3.5 h-3.5 animate-pulse shrink-0" />
-                                  <span className="truncate">{plan.thinking || 'Connecting...'}</span>
-                               </div>
-                            )}
-                            {plan.result && (
-                               <div className="p-4 sm:p-5 text-dash-primary markdown-body leading-relaxed text-[13px]">
-                                  <Markdown>{plan.result}</Markdown>
-                               </div>
-                            )}
-                         </div>
-                      )}
-                   </motion.div>
-                )})}
-              </div>
-           )}
-         </motion.div>
-      </div>
+      <LifeStrategyTimeline 
+         lifeStrategiesShort={data.lifeStrategiesShort}
+         lifeStrategiesLong={data.lifeStrategiesLong}
+         nodePlans={nodePlans}
+         handleInlineNodePlan={handleInlineNodePlan}
+      />
 
       {/* 底部目标追踪卡片 (Goal Tracker) */}
       {data.goal?.name && data.goal.name !== '等待设定目标' && (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 relative overflow-hidden group mb-10 shadow-sm transition-colors hover:bg-dash-surface-hover"
-      >
-        <div className="relative z-10 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 sm:gap-8 mb-6 sm:mb-8">
-          <div className="flex-1">
-            <h3 className="text-xl sm:text-2xl font-sans tracking-tight font-medium text-dash-primary break-words">{data.goal?.name || "战略目标"}</h3>
-            <p className="text-[13px] text-dash-tertiary mt-2 font-mono break-all sm:break-normal font-medium tracking-wide">
-              PROGRESS TARGET <span className="text-dash-secondary ml-2 font-semibold">{globalCurSymbol}{(data.goal?.current || 0).toLocaleString()} <span className="text-dash-subtle mx-1">/</span> {globalCurSymbol}{(data.goal?.target || 0).toLocaleString()}</span>
-            </p>
-          </div>
-          <div className="text-left sm:text-right">
-            <div className="text-[10px] text-dash-tertiary uppercase mb-2 tracking-widest font-semibold font-sans">Achievement Index</div>
-            <div className={`text-4xl sm:text-5xl font-mono tabular-nums tracking-tighter ${data.goal?.index >= 1 ? 'text-dash-green' : 'text-dash-primary'}`}>
-              {(data.goal?.index || 0).toFixed(4)}
-            </div>
-          </div>
-        </div>
-        <div className="relative z-10 w-full h-3 sm:h-4 bg-dash-surface border border-dash-subtle rounded-full overflow-hidden shadow-inner">
-          <div className={`h-full relative z-10 transition-all duration-1000 ${data.goal?.index >= 1 ? 'bg-dash-green' : 'bg-dash-primary'}`} style={{ width: `${goalPercent}%` }}>
-          </div>
-        </div>
-      </motion.div>
+         <GoalTracker goal={data.goal} globalCurSymbol={globalCurSymbol} />
       )}
       </main>
 
