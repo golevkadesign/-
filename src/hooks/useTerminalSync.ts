@@ -3,7 +3,7 @@ import { subscribeToAuthChanges, db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { TerminalState } from '../types/terminal';
 import { sanitizeTerminalState } from '../lib/sanitizer';
-import { mergeWith, isArray } from 'lodash-es';
+import { mergeWith, isArray, debounce } from 'lodash-es';
 
 export const EMPTY_STATE: TerminalState = {
   userPersona: { tags: [], description: "唤起总监生成您的个人资产画像模型" },
@@ -22,6 +22,11 @@ export const EMPTY_STATE: TerminalState = {
   lifeStrategiesShort: [],
   lifeStrategiesLong: []
 };
+
+const debouncedSyncToCloud = debounce((uid: string, payload: any) => {
+  setDoc(doc(db, "userProfiles", uid), payload, { merge: true })
+    .catch(e => console.error("Failed to commit appData to firestore:", e));
+}, 2000);
 
 export function useTerminalSync() {
   const [user, setUser] = useState<any>(null);
@@ -43,44 +48,51 @@ export function useTerminalSync() {
       setUser(u);
       if (u) {
          let localState: TerminalState = EMPTY_STATE;
-         const stored = localStorage.getItem(`ai_terminal_data_${u.uid}`);
-         if (stored) {
-             try { localState = { ...EMPTY_STATE, ...JSON.parse(stored) }; } catch { localState = EMPTY_STATE; }
-         } else {
-             const oldStored = localStorage.getItem('ai_terminal_data');
-             if (oldStored) {
-                 try { 
-                     localState = { ...EMPTY_STATE, ...JSON.parse(oldStored) };
-                     localStorage.setItem(`ai_terminal_data_${u.uid}`, oldStored);
-                     localStorage.removeItem('ai_terminal_data');
-                 } catch { localState = EMPTY_STATE; }
-             }
-         }
+         let cloudHydrated = false;
 
-         // Fetch userProfile and appData from Firestore
+         // Fetch userProfile and appData from Firestore FIRST (Cloud-First Hydration)
          try {
            const profileSnap = await getDoc(doc(db, "userProfiles", u.uid));
            if (profileSnap.exists()) {
               const fsData = profileSnap.data();
               if (fsData.appData && Object.keys(fsData.appData).length > 0) {
-                 localState = { ...localState, ...fsData.appData };
+                 localState = { ...EMPTY_STATE, ...fsData.appData };
+                 cloudHydrated = true;
               }
               if (fsData.userProfile) {
                  localState = { ...localState, userProfile: fsData.userProfile };
               } else if (!fsData.appData && !fsData.chatHistory) {
                  localState = { ...localState, userProfile: fsData };
               }
-              localStorage.setItem(`ai_terminal_data_${u.uid}`, JSON.stringify(localState));
-           } else {
-              localState = { ...localState, userProfile: {} };
+              
+              if (cloudHydrated || fsData.userProfile || (!fsData.appData && !fsData.chatHistory)) {
+                 localStorage.setItem(`ai_terminal_data_${u.uid}`, JSON.stringify(localState));
+                 cloudHydrated = true;
+              }
            }
          } catch(e: any) {
            if (e.message && e.message.includes('offline')) {
-             console.log("Offline mode: using local state for profile.");
+             console.log("Offline mode: using local state fallback.");
            } else {
              console.error("Failed to load user profile from firestore:", e);
            }
-           localState = { ...localState, userProfile: {} };
+         }
+         
+         // Fallback to localStorage if cloud hydration failed or empty
+         if (!cloudHydrated) {
+            const stored = localStorage.getItem(`ai_terminal_data_${u.uid}`);
+            if (stored) {
+                try { localState = { ...EMPTY_STATE, ...JSON.parse(stored) }; } catch { localState = EMPTY_STATE; }
+            } else {
+                const oldStored = localStorage.getItem('ai_terminal_data');
+                if (oldStored) {
+                    try { 
+                        localState = { ...EMPTY_STATE, ...JSON.parse(oldStored) };
+                        localStorage.setItem(`ai_terminal_data_${u.uid}`, oldStored);
+                        localStorage.removeItem('ai_terminal_data');
+                    } catch { localState = EMPTY_STATE; }
+                }
+            }
          }
          
          setData(sanitizeTerminalState(localState) as TerminalState);
@@ -108,7 +120,7 @@ export function useTerminalSync() {
           localStorage.setItem(`ai_terminal_data_${user.uid}`, JSON.stringify(fullData));
           const appDataToSave = { ...fullData };
           delete appDataToSave.userProfile; // RAG profile saved separately in the same doc
-          setDoc(doc(db, "userProfiles", user.uid), { appData: appDataToSave, userProfile: fullData.userProfile }, { merge: true }).catch(e => console.error("Failed to commit appData to firestore:", e));
+          debouncedSyncToCloud(user.uid, { appData: appDataToSave, userProfile: fullData.userProfile });
       }
       return fullData;
     });
