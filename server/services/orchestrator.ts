@@ -201,6 +201,13 @@ export async function streamSynthesis(userTier: string, message: string, externa
 
   const template = settings?.agentPrompts?.orchestrator || DEFAULT_PROMPTS.orchestrator;
 
+  const safeDistributions = { ...(externalData?.contextData?.distributions || {}) };
+
+  // 💥 核心防线：如果检测到后端已成功获取实盘/外部最新数据，强制物理覆盖前端的历史 RAG 记忆！
+  if (externalData?.livePortfolio && externalData.livePortfolio.length > 0) {
+      safeDistributions.publicHoldings = externalData.livePortfolio;
+  }
+
   const uiSummaryInstructions = `
 ========================================
 【前端渲染与状态更新契约 (CRITICAL)】
@@ -226,7 +233,7 @@ export async function streamSynthesis(userTier: string, message: string, externa
 当前前端面板状态 (TERMINAL_STATE)：
 ${JSON.stringify({ 
     metrics: externalData?.contextData?.metrics || {},
-    distributions: externalData?.contextData?.distributions || {},
+    distributions: safeDistributions,
     lifeStrategiesShort: externalData?.contextData?.lifeStrategiesShort || [],
     lifeStrategiesLong: externalData?.contextData?.lifeStrategiesLong || []
 }, null, 2)}
