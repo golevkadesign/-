@@ -5,6 +5,42 @@ import { Sparkles, Activity, AlertTriangle, Zap, ArrowRight, ShieldAlert } from 
 import { getSDUIPieOption, getDonutOption, getExpenseOption, getWaterfallOption, getHoldingsOption, getOptionsOption, getCurrencySymbol } from '../components/chart-configs';
 import { ChartWidget } from '../components/ChartWidget';
 import { SDUIComponent } from '../types/terminal';
+import { useInteractionStore } from '../hooks/useInteractionStore';
+
+const bgMap: Record<string, string> = {
+  'surface-base': 'bg-dash-surface',
+  'surface-elevated': 'bg-dash-surface-hover',
+  'surface-highlight': 'bg-white/5',
+  'danger-muted': 'bg-red-500/10',
+  'warning-muted': 'bg-amber-500/10',
+  'transparent': 'bg-transparent'
+};
+const textMap: Record<string, string> = {
+  'text-primary': 'text-white',
+  'text-muted': 'text-slate-400',
+  'text-accent': 'text-dash-primary',
+  'danger': 'text-red-400',
+  'warning': 'text-amber-400',
+  'success': 'text-emerald-400'
+};
+const typoMap: Record<string, string> = {
+  'h1': 'text-3xl font-bold',
+  'h2': 'text-2xl font-bold',
+  'h3': 'text-xl font-semibold',
+  'h3-serif': 'text-xl font-serif font-medium tracking-wide',
+  'body': 'text-base',
+  'body-sm': 'text-sm',
+  'caption': 'text-xs uppercase tracking-wider'
+};
+const borderMap: Record<string, string> = {
+  'border-subtle': 'border border-dash-subtle',
+  'border-strong': 'border border-slate-700',
+  'danger': 'border border-red-500/30',
+  'none': 'border-none'
+};
+const paddingMap: Record<string, string> = {
+  'none': 'p-0', 'sm': 'p-2', 'md': 'p-4', 'lg': 'p-6'
+};
 
 export const ComponentRegistry: Record<string, React.FC<any>> = {
   Grid: ({ columns = 1, gap = 6, className = "", children }) => {
@@ -56,6 +92,38 @@ export const ComponentRegistry: Record<string, React.FC<any>> = {
         insight={globalData?.insights?.[insightKey] || ""}
         dataLength={distData.length}
       />
+    );
+  },
+  Box: ({ bg = 'transparent', border = 'none', padding = 'none', className = '', children, globalData }) => {
+    const classes = [bgMap[bg] || '', borderMap[border] || '', paddingMap[padding] || '', className].join(' ');
+    return <div className={classes.trim()}>{children}</div>;
+  },
+  Typography: ({ variant = 'body', color = 'text-primary', text, className = '' }) => {
+    const classes = [typoMap[variant] || typoMap['body'], textMap[color] || textMap['text-primary'], className].join(' ');
+    return <div className={classes.trim()}>{text}</div>;
+  },
+  Badge: ({ intent = 'default', text, className = '' }) => {
+    const intentStyles: Record<string, string> = {
+      'critical': 'bg-red-500/20 text-red-400 border-red-500/30',
+      'warning': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      'success': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      'default': 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+    };
+    const classes = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${intentStyles[intent] || intentStyles['default']} ${className}`;
+    return <span className={classes}>{text}</span>;
+  },
+  ActionButton: ({ actionIntent, label, variant = 'primary', className = '' }) => {
+    const openDrawerWithIntent = useInteractionStore(state => state.openDrawerWithIntent);
+    const variantStyles: Record<string, string> = {
+      'primary': 'bg-dash-primary text-black hover:bg-dash-primary/90',
+      'danger': 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30',
+      'outline': 'bg-transparent border border-dash-subtle text-white hover:bg-dash-surface-hover'
+    };
+    const classes = `px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${variantStyles[variant] || variantStyles['primary']} ${className}`;
+    return (
+      <button onClick={() => actionIntent && openDrawerWithIntent(actionIntent)} className={classes}>
+        {label}
+      </button>
     );
   },
   ChartWidget: (props) => <ChartWidget {...props} />,
