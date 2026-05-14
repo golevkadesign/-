@@ -9,6 +9,7 @@ export interface WidgetCopilotProps {
   widgetTitle: string;
   widgetData: any;
   expertRole?: string;
+  globalData?: any;
   onPromoteIntent: (prompt: string) => void;
 }
 
@@ -18,6 +19,7 @@ export const WidgetCopilot: React.FC<WidgetCopilotProps> = ({
   widgetTitle,
   widgetData,
   expertRole = "首席资产分析师",
+  globalData,
   onPromoteIntent
 }) => {
   const [messages, setMessages] = useState<{ role: 'user' | 'model', content: string }[]>([]);
@@ -30,21 +32,6 @@ export const WidgetCopilot: React.FC<WidgetCopilotProps> = ({
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
-
-  // Read terminal data from localStorage for userProfile context
-  const getGlobalProfile = () => {
-    try {
-      const ustr = localStorage.getItem('ai_terminal_user');
-      if (ustr) {
-        const u = JSON.parse(ustr);
-        const dataStr = localStorage.getItem(`ai_terminal_data_${u.uid}`);
-        if (dataStr) {
-           return JSON.parse(dataStr).userProfile || {};
-        }
-      }
-    } catch(e) {}
-    return {};
-  };
 
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
@@ -64,8 +51,9 @@ export const WidgetCopilot: React.FC<WidgetCopilotProps> = ({
           history: messages,
           message: userMsg,
           widgetContext: widgetData,
+          widgetTitle: widgetTitle,
           expertRole: expertRole,
-          userProfile: getGlobalProfile(),
+          globalState: globalData,
           settings: getSettings()
         })
       });
@@ -87,17 +75,22 @@ export const WidgetCopilot: React.FC<WidgetCopilotProps> = ({
       
       setMessages(prev => [...prev, { role: 'model', content: '' }]);
 
+      let buffer = ''; // 新增：粘包缓冲器
+      
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         
-        const chunkStr = decoder.decode(value, { stream: true });
-        const lines = chunkStr.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        
+        // 将最后可能不完整的字符串放回 buffer，等待下一个 chunk 补齐
+        buffer = lines.pop() || '';
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const dataStr = line.slice(6);
-            if (dataStr === '[DONE]') continue;
+            if (dataStr.trim() === '[DONE]') continue;
             try {
               const data = JSON.parse(dataStr);
               if (data.error) {
@@ -106,9 +99,11 @@ export const WidgetCopilot: React.FC<WidgetCopilotProps> = ({
               if (data.text) {
                 setMessages(prev => {
                   const newMsgs = [...prev];
-                  const last = newMsgs[newMsgs.length - 1];
+                  const lastIndex = newMsgs.length - 1;
+                  const last = newMsgs[lastIndex];
                   if (last && last.role === 'model') {
-                    last.content += data.text;
+                    // 💥 修复复读机Bug：必须生成一个全新的对象，不能直接 += 修改原对象
+                    newMsgs[lastIndex] = { ...last, content: last.content + data.text };
                   }
                   return newMsgs;
                 });

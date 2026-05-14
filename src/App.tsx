@@ -592,6 +592,7 @@ export default function App() {
         widgetTitle={copilotConfig.title}
         widgetData={copilotConfig.data}
         expertRole={copilotConfig.role}
+        globalData={data}
         onPromoteIntent={(prompt) => {
            window.dispatchEvent(new CustomEvent('trigger-ai-drawer', { detail: prompt }))
         }}
