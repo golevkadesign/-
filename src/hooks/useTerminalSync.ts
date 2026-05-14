@@ -64,13 +64,13 @@ export function useTerminalSync() {
               const fsData = profileSnap.data();
               if (fsData.appData && Object.keys(fsData.appData).length > 0) {
                  localState = { ...localState, ...fsData.appData };
-                 localStorage.setItem(`ai_terminal_data_${u.uid}`, JSON.stringify(localState));
               }
               if (fsData.userProfile) {
                  localState = { ...localState, userProfile: fsData.userProfile };
               } else if (!fsData.appData && !fsData.chatHistory) {
                  localState = { ...localState, userProfile: fsData };
               }
+              localStorage.setItem(`ai_terminal_data_${u.uid}`, JSON.stringify(localState));
            } else {
               localState = { ...localState, userProfile: {} };
            }
@@ -107,8 +107,8 @@ export function useTerminalSync() {
       if (user?.uid) {
           localStorage.setItem(`ai_terminal_data_${user.uid}`, JSON.stringify(fullData));
           const appDataToSave = { ...fullData };
-          delete appDataToSave.userProfile; // RAG profile saved separately
-          setDoc(doc(db, "userProfiles", user.uid), { appData: appDataToSave }, { merge: true }).catch(e => console.error("Failed to commit appData to firestore:", e));
+          delete appDataToSave.userProfile; // RAG profile saved separately in the same doc
+          setDoc(doc(db, "userProfiles", user.uid), { appData: appDataToSave, userProfile: fullData.userProfile }, { merge: true }).catch(e => console.error("Failed to commit appData to firestore:", e));
       }
       return fullData;
     });

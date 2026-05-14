@@ -221,6 +221,7 @@ export async function streamSynthesis(userTier: string, message: string, externa
 - 【数组全量替换原则 (CRITICAL)】：当用户提到生活开支(expenses)、负债(liabilities)或资产配置的变更（例如：房贷被抵扣、清仓某只股票）时，你必须在 JSON 中下发**更新后的完整列表**。前端会直接整体替换，切勿只下发增量或直接省略！
 - 【严禁捏造市值 (CRITICAL)】：在更新 \`publicHoldings\` 时，\`_livePrice\` 和 \`marketValue\` 必须严格使用 \`[MARKET_DATA]\` 中的真实数据。如果缺少某只股票的最新股价，按原样保留，**绝不许凭空幻觉捏造数值或借用其他股票的价格！**
 - 【强制响应原则】：如果你在正文文本中建议了清仓、修改开支，你的 JSON Patch (\`updateGlobalState\`) 中就必须包含对应的字段体现这一变化，不允许口是心非。
+- 【主动干预原则 (CRITICAL)】：如果用户明确要求渲染干预卡片，或者你判定当前面临极端的宏观异动/账户危机，你必须在 \`sduiSchema\` 数组中下发一个 \`InterventionCard\`。
 
 当前前端面板状态 (TERMINAL_STATE)：
 ${JSON.stringify({ 
@@ -233,7 +234,29 @@ ${JSON.stringify({
 注意！你的末尾 JSON Patch 必须符合以下严格结构示例：
 \`\`\`json
 {
-  "sduiSchema": [],
+  "sduiSchema": [
+    {
+      "id": "alert-001",
+      "type": "InterventionCard",
+      "props": {
+        "title": "🚨 宏观异动：纳斯达克盘前重挫",
+        "description": "系统监测到科技股发生踩踏式抛售，建议立即对冲。",
+        "level": "critical",
+        "actions": [
+          {
+            "label": "生成期权对冲策略",
+            "prompt": "请帮我测算买入 SQQQ 对冲 30% 风险敞口的具体成本和执行方案",
+            "type": "primary"
+          },
+          {
+            "label": "忽略警报",
+            "prompt": "我选择死扛，请重新评估危险指数",
+            "type": "secondary"
+          }
+        ]
+      }
+    }
+  ],
   "updateGlobalState": {
     "metrics": { "netWorth": 1000000, "netWorthSummary": "总结短句..." },
     "userPersona": { "tags": ["稳健型", "高薪资"], "description": "您的核心画像..." },

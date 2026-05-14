@@ -10,13 +10,15 @@ import { DeveloperView } from './components/DeveloperView';
 import { Drawer } from './components/Drawer';
 import { useTerminalSync, EMPTY_STATE } from './hooks/useTerminalSync';
 import { useStrategyStream } from './hooks/useStrategyStream';
+import { useSentinel } from './hooks/useSentinel';
 
 
 // Replaced by getUniversalAiClient
 
-import { Sparkles, LogOut, ChevronDown, User, Activity, Loader2, RefreshCw, Cpu, Settings, Bot } from 'lucide-react';
+import { Sparkles, LogOut, ChevronDown, User, Activity, Loader2, RefreshCw, Cpu, Settings, Bot, Database } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { ChartWidget } from './components/ChartWidget';
+import { ProfileReportView } from './components/ProfileReportView';
 
 import { ComponentRegistry, SDUIRenderer } from './lib/sdui-registry';
 
@@ -37,11 +39,14 @@ export default function App() {
   const globalCurSymbol = getCurrencySymbol(globalCurrencyOption);
   const { nodePlans, executePlan, clearNodePlans } = useStrategyStream();
 
+  useSentinel({ data, commitData });
+
   const [sduiState, setSduiState] = useState<any[]>([]);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showDeveloperView, setShowDeveloperView] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showProfileReport, setShowProfileReport] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const donutOption = useMemo(() => getDonutOption(data), [data?.distributions?.liquidity]);
@@ -144,6 +149,15 @@ export default function App() {
           
           <div className="flex items-center gap-3 sm:gap-4 lg:gap-6">
             <button
+              onClick={() => setShowProfileReport(true)}
+              className="flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-dash-surface border border-dash-subtle text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover transition-colors font-mono text-[10px] sm:text-xs uppercase tracking-widest font-semibold shadow-sm"
+              title="长线记忆 / Memory Profile"
+            >
+              <Database className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Memory</span>
+            </button>
+
+            <button
               onClick={() => setShowDeveloperView(true)}
               className="flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-dash-surface border border-dash-subtle text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover transition-colors font-mono text-[10px] sm:text-xs uppercase tracking-widest font-semibold shadow-sm"
               title="开发者视图 / Developer View"
@@ -181,6 +195,9 @@ export default function App() {
                     <p className="text-[13px] font-bold text-dash-primary truncate">{user.displayName}</p>
                     <p className="text-[11px] font-mono tracking-wide text-dash-tertiary truncate">{user.email}</p>
                   </div>
+                  <button onClick={() => setShowProfileReport(true)} className="w-full flex items-center gap-2 text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover p-2.5 rounded-xl text-xs font-semibold transition-colors mb-1 uppercase tracking-wide">
+                    <User className="w-4 h-4" /> 长线记忆
+                  </button>
                   <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-2 text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover p-2.5 rounded-xl text-xs font-semibold transition-colors mb-1 uppercase tracking-wide">
                     <Settings className="w-4 h-4" /> Settings
                   </button>
@@ -549,6 +566,7 @@ export default function App() {
       )}
 
       <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
+      <ProfileReportView isOpen={showProfileReport} onClose={() => setShowProfileReport(false)} data={data} commitData={commitData} />
 
       <Drawer 
         isDrawerOpen={isDrawerOpen} 
