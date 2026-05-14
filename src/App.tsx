@@ -11,6 +11,7 @@ import { Drawer } from './components/Drawer';
 import { useTerminalSync, EMPTY_STATE } from './hooks/useTerminalSync';
 import { useStrategyStream } from './hooks/useStrategyStream';
 import { useSentinel } from './hooks/useSentinel';
+import { useInteractionStore } from './hooks/useInteractionStore';
 
 
 // Replaced by getUniversalAiClient
@@ -39,26 +40,16 @@ export default function App() {
   const globalCurrencyOption = data?.distributions?.liquidity?.[0]?.currency || 'CNY';
   const globalCurSymbol = getCurrencySymbol(globalCurrencyOption);
   const { nodePlans, executePlan, clearNodePlans } = useStrategyStream();
+  const { isDrawerOpen, setDrawerOpen, copilotConfig, closeCopilot, openCopilot, openDrawerWithIntent } = useInteractionStore();
 
   useSentinel({ data, commitData });
 
   const [sduiState, setSduiState] = useState<any[]>([]);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showDeveloperView, setShowDeveloperView] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showProfileReport, setShowProfileReport] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [copilotConfig, setCopilotConfig] = useState<{isOpen: boolean, title: string, data: any, role: string}>({ isOpen: false, title: '', data: null, role: '' });
-
-  useEffect(() => {
-    const handleOpenCopilot = (e: any) => {
-      const { title, data, role } = e.detail;
-      setCopilotConfig({ isOpen: true, title, data, role });
-    };
-    window.addEventListener('open-widget-copilot', handleOpenCopilot);
-    return () => window.removeEventListener('open-widget-copilot', handleOpenCopilot);
-  }, []);
 
   const donutOption = useMemo(() => getDonutOption(data), [data?.distributions?.liquidity]);
 
@@ -180,7 +171,7 @@ export default function App() {
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setIsDrawerOpen(true)} 
+              onClick={() => setDrawerOpen(true)} 
               className="hidden md:flex items-center gap-2 px-6 py-2.5 rounded-[12px] text-[13px] font-bold bg-dash-primary text-dash-base hover:bg-white transition-colors shadow-sm"
             >
               <Sparkles className="w-4 h-4" /> Initialize
@@ -189,7 +180,7 @@ export default function App() {
             {/* Mobile simplified AI button */}
             <motion.button 
               whileTap={{ scale: 0.95 }}
-              onClick={() => setIsDrawerOpen(true)} 
+              onClick={() => setDrawerOpen(true)} 
               className="flex md:hidden items-center justify-center w-10 h-10 rounded-[12px] bg-dash-primary text-dash-base hover:bg-white transition-colors shadow-sm"
             >
               <Sparkles className="w-5 h-5" />
@@ -235,7 +226,7 @@ export default function App() {
             </h2>
             <button
                className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-dash-primary/10 text-dash-primary border border-dash-primary/20 hover:bg-dash-primary/20 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 z-20 shadow-sm"
-               onClick={() => setCopilotConfig({ isOpen: true, title: 'Strategic Overview', data: data.insights?.global, role: '首席宏观策略师' })}
+               onClick={() => openCopilot('Strategic Overview', data.insights?.global, '首席宏观策略师')}
             >
                <Bot className="w-3.5 h-3.5" /> 专家探讨
             </button>
@@ -588,19 +579,17 @@ export default function App() {
       <ProfileReportView isOpen={showProfileReport} onClose={() => setShowProfileReport(false)} data={data} commitData={commitData} />
       <WidgetCopilot 
         isOpen={copilotConfig.isOpen}
-        onClose={() => setCopilotConfig(prev => ({ ...prev, isOpen: false }))}
+        onClose={closeCopilot}
         widgetTitle={copilotConfig.title}
         widgetData={copilotConfig.data}
         expertRole={copilotConfig.role}
         globalData={data}
-        onPromoteIntent={(prompt) => {
-           window.dispatchEvent(new CustomEvent('trigger-ai-drawer', { detail: prompt }))
-        }}
+        onPromoteIntent={openDrawerWithIntent}
       />
 
       <Drawer 
         isDrawerOpen={isDrawerOpen} 
-        setIsDrawerOpen={setIsDrawerOpen} 
+        setIsDrawerOpen={setDrawerOpen} 
         user={user} 
         data={data} 
         setSduiState={setSduiState} 

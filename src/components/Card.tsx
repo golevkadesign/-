@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import { useInteractionStore } from '../hooks/useInteractionStore';
 
 interface CardProps {
   title: string;
@@ -28,7 +29,7 @@ export const Card: React.FC<CardProps> = ({ title, value, subValue, trendGood = 
             {badge}
             <button
                className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-dash-primary/10 text-dash-primary border border-dash-primary/20 hover:bg-dash-primary/20 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-sm"
-               onClick={() => window.dispatchEvent(new CustomEvent('open-widget-copilot', { detail: { title, data: { value, subValue }, role: '垂直领域专家' } }))}
+               onClick={() => useInteractionStore.getState().openCopilot(title, { value, subValue }, '垂直领域专家')}
                title="专家探讨"
             >
                ✨ 空中脑暴

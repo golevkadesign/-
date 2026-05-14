@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { PieChart, RefreshCw } from 'lucide-react';
 import { ReactECharts } from './ReactECharts';
+import { useInteractionStore } from '../hooks/useInteractionStore';
 
 interface ChartWidgetProps {
   title: React.ReactNode;
@@ -33,7 +34,7 @@ export function ChartWidget({ title, dataLength, insight, option, delay = 0, cha
           {badge && <div>{badge}</div>}
           <button
              className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-dash-primary/10 text-dash-primary border border-dash-primary/20 hover:bg-dash-primary/20 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-sm"
-             onClick={() => window.dispatchEvent(new CustomEvent('open-widget-copilot', { detail: { title, data: { insight }, role: '数据分析专家' } }))}
+             onClick={() => useInteractionStore.getState().openCopilot(title as string, { insight }, '数据分析专家')}
              title="专家探讨"
           >
              ✨ 空中脑暴

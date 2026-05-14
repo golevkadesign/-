@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Upload, X, FileText, RefreshCw, Paperclip, Send, StopCircle, Check } from 'lucide-react';
 import { ChatList } from './ui/chat-ui';
 import { useAiAgent } from '../hooks/useAiAgent';
+import { useInteractionStore } from '../hooks/useInteractionStore';
 
 // Shared utility
 function fileToBase64(file: File): Promise<{ mimeType: string, data: string, name: string }> {
@@ -48,23 +49,25 @@ export const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState
     }
   };
 
+  const { pendingGlobalIntent, clearPendingIntent } = useInteractionStore();
+
   useEffect(() => {
-    const handleTrigger = (e: any) => {
-      setIsDrawerOpen(true);
-      const msg = e.detail;
-      handleAiSubmit(msg);
-    };
+    if (pendingGlobalIntent) {
+      handleAiSubmit(pendingGlobalIntent);
+      clearPendingIntent();
+    }
+  }, [pendingGlobalIntent, handleAiSubmit, clearPendingIntent]);
+
+  useEffect(() => {
     const handleAddAttachment = (e: any) => {
       const att = e.detail;
       setAttachments(prev => [...prev, att]);
     };
-    window.addEventListener('trigger-ai-drawer', handleTrigger);
     window.addEventListener('add-attachment', handleAddAttachment);
     return () => {
-       window.removeEventListener('trigger-ai-drawer', handleTrigger);
        window.removeEventListener('add-attachment', handleAddAttachment);
     };
-  }, [chatHistory, attachments, isLoading, data, user]);
+  }, [setAttachments]);
 
   return (
     <div 
