@@ -168,26 +168,6 @@ export default function App() {
           </p>
         </motion.div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 pt-0 mb-8"
-        >
-          <Card title="总净资产 (Net Worth)" value={formatMoney(data.metrics?.netWorth, globalCurSymbol)} subValue={data.metrics?.netWorthSummary} isLongSubText />
-          <Card title="可用现金池 (Liquidity)" value={formatMoney(data.metrics?.liquidity, globalCurSymbol)} subValue={data.metrics?.liquiditySummary} isLongSubText />
-          <Card title="抗风险系数 (Safety Ratio)" value={data.metrics?.safetyRatio?.toFixed(2) || '0.00'} subValue={data.metrics?.safetyRatioSummary || '当前流动性支撑乘数'} isLongSubText />
-          <Card title="月自由现金流 (FCF)" value={formatMoney(data.metrics?.fcf, globalCurSymbol)} subValue={data.metrics?.fcfSummary || '测算月结余'} isLongSubText />
-        </motion.div>
-
-      {(data.sduiSchema?.length > 0 || sduiState.length > 0) && (
-        <div className="mb-10 w-full">
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             <SDUIRenderer schema={data.sduiSchema || sduiState} />
-           </div>
-        </div>
-      )}
-
       {/* 新增: 用户画像 (User Persona) */}
       {(data.userPersona?.description && !data.userPersona.description.includes("当前信息不足以")) && (
       <div className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 md:p-8 mb-8 shadow-sm">
@@ -207,117 +187,13 @@ export default function App() {
       </div>
       )}
 
-      {/* Adaptive Widget System: 核心图表与洞察 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 mb-8">
+      {/* AI 战术干预层 (警报、临时操作区) */}
+      {data.dynamicWidgets && data.dynamicWidgets.length > 0 && (
+         <div className="mb-8 w-full"><SDUIRenderer schema={data.dynamicWidgets} globalData={data} /></div>
+      )}
 
-        {/* 流动资金库 */}
-        {data.distributions?.liquidity?.length > 0 && (
-          <ChartWidget 
-            status={isSynthesizing ? "loading" : undefined}
-            title="流动资金池"
-            dataLength={data.distributions?.liquidity?.length || 0}
-            insight={data.insights?.liquidity}
-            option={donutOption}
-            delay={0.1}
-          />
-        )}
-
-        {/* 公开市场持仓分析 (Text Card) */}
-        {data.insights?.publicText && data.distributions?.publicHoldings?.length > 0 && (
-          <Card 
-            title="公开市场持仓评估" 
-            delay={0.15} 
-            className="border-[#8b5cf6]/30 bg-[#1A1D21]/50 backdrop-blur-md"
-            badge={data._liveSources?.includes('longbridge') ? <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">Live Source</span> : <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-500/10 text-slate-400 border border-slate-500/20">RAG Memory</span>}
-          >
-            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap p-2 markdown-body">
-               <Markdown>{data.insights.publicText}</Markdown>
-            </div>
-          </Card>
-        )}
-
-        {/* 公开市场持仓横向图表 (Chart Card) */}
-        {(data.distributions?.publicHoldings?.length > 0) && (
-          <ChartWidget 
-            status={isSynthesizing ? "loading" : undefined}
-            title="公开市场持仓视图"
-            dataLength={data.distributions?.publicHoldings?.length || 0}
-            insight={data.insights?.publicSummary}
-            option={holdingsOption}
-            delay={0.2}
-            chartHeight="300px"
-          />
-        )}
-
-        {/* 期权及衍生品 */}
-        {data.distributions?.options?.length > 0 && (
-          <ChartWidget 
-            status={isSynthesizing ? "loading" : undefined}
-            title="衍生品及期权"
-            dataLength={data.distributions?.options?.length || 0}
-            insight={data.insights?.options}
-            option={optionsOption}
-            delay={0.3}
-            chartHeight="200px"
-          />
-        )}
-
-        {/* 非公开资产 */}
-        {(data.distributions?.privateAssets?.length > 0 || (data.insights?.private && data.insights.private !== "暂无非公开资产数据")) && (
-          <ChartWidget 
-            status={isSynthesizing ? "loading" : undefined}
-            title="非公开资产估值"
-            dataLength={data.distributions?.privateAssets?.length || (data.insights?.private && data.insights.private !== "暂无非公开资产数据" ? 1 : 0)}
-            insight={data.insights?.private}
-            option={waterfallOption}
-            delay={0.4}
-            chartHeight="200px"
-          />
-        )}
-
-        {/* 预估固定资产 */}
-        {data.distributions?.fixedAssets?.length > 0 && (
-          <ChartWidget 
-            status={isSynthesizing ? "loading" : undefined}
-            title="固定资产与负债估值"
-            dataLength={data.distributions?.fixedAssets?.length || 0}
-            insight={data.insights?.fixedAssets}
-            delay={0.5}
-            chartHeight="100%"
-          >
-            <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto custom-scroll pr-2">
-              {data.distributions?.fixedAssets?.map((asset: any, idx: number) => (
-                 <div key={idx} className="bg-dash-surface-hover border border-dash-subtle rounded-3xl p-5 sm:p-6 shrink-0 shadow-sm">
-                    <div className="font-semibold text-dash-primary mb-4 text-sm sm:text-[15px] flex justify-between items-start tracking-tight">
-                      {asset.name}
-                    </div>
-                    <div className="flex justify-between items-center text-[13px] mb-3">
-                       <span className="text-dash-secondary font-mono tracking-wide">Estimated Value</span>
-                       <span className="text-dash-primary font-mono font-bold tracking-tight">{getCurrencySymbol(asset.currency || globalCurrencyOption)}{(asset.marketValue ?? asset.value ?? 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[13px] mb-2">
-                       <span className="text-dash-secondary font-mono tracking-wide">Debt / Cost</span>
-                       <span className="text-dash-red font-mono font-bold tracking-tight">{getCurrencySymbol(asset.currency || globalCurrencyOption)}{(asset.holdingCost ?? 0).toLocaleString()}</span>
-                    </div>
-                 </div>
-              ))}
-            </div>
-          </ChartWidget>
-        )}
-
-        {/* 开支结构 */}
-        {data.distributions?.expenses?.length > 0 && (
-          <ChartWidget 
-            status={isSynthesizing ? "loading" : undefined}
-            title="开支结构分析"
-            dataLength={data.distributions?.expenses?.length || 0}
-            insight={data.insights?.expenses}
-            option={expenseOption}
-            delay={0.6}
-          />
-        )}
-
-      </div>
+      {/* 战略基座层 (指标卡与核心图表) */}
+      <SDUIRenderer schema={data.dashboardSchema} globalData={data} />
 
       {/* 阶段性人生策略建议 (Life Strategies Timeline) */}
       <LifeStrategyTimeline 

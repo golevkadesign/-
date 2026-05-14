@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { TerminalState } from '../types/terminal';
 import { sanitizeTerminalState } from '../lib/sanitizer';
 import { mergeWith, isArray, debounce } from 'lodash-es';
+import { DEFAULT_DASHBOARD_SCHEMA } from '../lib/default-schema';
 
 export const EMPTY_STATE: TerminalState = {
   userPersona: { tags: [], description: "唤起总监生成您的个人资产画像模型" },
@@ -20,7 +21,9 @@ export const EMPTY_STATE: TerminalState = {
   goal: { name: '等待设定目标', current: 0, target: 1, index: 0 },
   insights: { global: "等待数据注入...", private: "暂无非公开资产数据" },
   lifeStrategiesShort: [],
-  lifeStrategiesLong: []
+  lifeStrategiesLong: [],
+  dynamicWidgets: [],
+  dashboardSchema: DEFAULT_DASHBOARD_SCHEMA,
 };
 
 const debouncedSyncToCloud = debounce((uid: string, payload: any) => {

@@ -2,32 +2,56 @@ import React, { useMemo } from 'react';
 import { Card } from '../components/Card';
 import { ReactECharts } from '../components/ReactECharts';
 import { Sparkles, Activity, AlertTriangle, Zap, ArrowRight, ShieldAlert } from 'lucide-react';
-import { getSDUIPieOption } from '../components/chart-configs';
+import { getSDUIPieOption, getDonutOption, getExpenseOption, getWaterfallOption, getHoldingsOption, getOptionsOption } from '../components/chart-configs';
 import { ChartWidget } from '../components/ChartWidget';
 import { SDUIComponent } from '../types/terminal';
 
 export const ComponentRegistry: Record<string, React.FC<any>> = {
-  Grid: ({ columns = 1, gap = 4, children, className = "" }) => {
-    const colClass = columns === 4 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 
-                     columns === 3 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 
-                     columns === 2 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1';
+  Grid: ({ columns = 1, gap = 6, className = "", children }) => {
+    // Handling dynamic grid cols can be tricky with Tailwind if not purged correctly,
+    // but typically `grid-cols-1`, `md:grid-cols-2`, `md:grid-cols-3` are common or we can map it
+    const colClass = columns === 4 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-4" : 
+                     columns === 2 ? "grid-cols-1 md:grid-cols-2" : 
+                     columns === 3 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1";
     return (
       <div className={`grid ${colClass} gap-${gap} ${className}`}>
         {children}
       </div>
     );
   },
-  Flex: ({ direction = 'col', justify, align, gap = 4, children, className = "" }) => {
-    const justifyClass = justify ? `justify-${justify}` : '';
-    const alignClass = align ? `items-${align}` : '';
+  MetricCard: ({ title, dataKey, isLongSubText, globalData }) => {
+    const metrics = globalData?.metrics || {};
+    const valueNum = metrics[dataKey];
+    const valueStr = valueNum !== undefined ? `$${Number(valueNum).toLocaleString()}` : 'N/A';
+    const subValue = metrics[`${dataKey}Summary`] || '';
+    return <Card title={title} value={valueStr} subValue={subValue} isLongSubText={isLongSubText} />;
+  },
+  DynamicChart: ({ title, chartType, chartHeight, delay, globalData }) => {
+    const distData = globalData?.distributions?.[chartType] || [];
+    let option = {};
+    const mockDataForConfig = { distributions: { [chartType]: distData } };
+    
+    if (chartType === 'liquidity') option = getDonutOption(mockDataForConfig);
+    else if (chartType === 'expenses') option = getExpenseOption(mockDataForConfig);
+    else if (chartType === 'privateAssets') option = getWaterfallOption(mockDataForConfig);
+    else if (chartType === 'publicHoldings') option = getHoldingsOption(mockDataForConfig);
+    else if (chartType === 'options') option = getOptionsOption(mockDataForConfig);
+
+    let insightKey = 'global';
+    if (chartType === 'publicHoldings' || chartType === 'options') insightKey = 'public';
+    if (chartType === 'privateAssets') insightKey = 'private';
+
     return (
-      <div className={`flex flex-${direction} gap-${gap} ${justifyClass} ${alignClass} ${className}`}>
-        {children}
-      </div>
+      <ChartWidget
+        title={title}
+        option={option}
+        chartHeight={chartHeight}
+        delay={delay}
+        insight={globalData?.insights?.[insightKey] || ""}
+        dataLength={distData.length}
+      />
     );
   },
-  MetricCard: (props) => <Card {...props} />,
-  DynamicChart: (props) => <ChartWidget {...props} />,
   ChartWidget: (props) => <ChartWidget {...props} />,
   MetricsCard: ({ title, value }) => <Card title={title} value={
     typeof value === 'number' ? `$${value.toLocaleString()}` : value
@@ -182,7 +206,7 @@ export const ComponentRegistry: Record<string, React.FC<any>> = {
   }
 };
 
-export const SDUIRenderer = ({ schema }: { schema?: SDUIComponent[] }) => {
+export const SDUIRenderer = ({ schema, globalData }: { schema?: SDUIComponent[], globalData?: any }) => {
   if (!schema || !Array.isArray(schema)) return null;
 
   return (
@@ -197,8 +221,8 @@ export const SDUIRenderer = ({ schema }: { schema?: SDUIComponent[] }) => {
            );
         }
         return (
-           <Component key={block.id || i} {...block.props}>
-              {block.children && <SDUIRenderer schema={block.children} />}
+           <Component key={block.id || i} {...block.props} globalData={globalData}>
+              {block.children && <SDUIRenderer schema={block.children} globalData={globalData} />}
            </Component>
         );
       })}

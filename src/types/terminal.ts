@@ -79,6 +79,7 @@ export interface TerminalState {
   lifeStrategiesShort: LifeStrategy[];
   lifeStrategiesLong: LifeStrategy[];
   _liveSources?: string[];
-  sduiSchema?: SDUIComponent[];
+  dynamicWidgets?: SDUIComponent[];
+  dashboardSchema?: SDUIComponent[];
   [key: string]: any;
 }
