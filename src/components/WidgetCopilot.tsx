@@ -70,7 +70,17 @@ export const WidgetCopilot: React.FC<WidgetCopilotProps> = ({
         })
       });
 
-      if (!res.ok || !res.body) throw new Error("Failed to connect to sandbox chat");
+      if (!res.ok) {
+        let errText = "Unknown Server Error";
+        try {
+           const errData = await res.json();
+           errText = errData.error || res.statusText;
+        } catch(e) {
+           errText = res.statusText;
+        }
+        throw new Error(`[HTTP ${res.status}] ${errText}`);
+      }
+      if (!res.body) throw new Error("No response body stream");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
