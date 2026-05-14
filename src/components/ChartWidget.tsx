@@ -25,11 +25,20 @@ export function ChartWidget({ title, dataLength, insight, option, delay = 0, cha
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 25, delay: delay }}
-      className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 flex flex-col relative overflow-hidden h-full shadow-sm"
+      className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 flex flex-col relative overflow-hidden h-full shadow-sm group hover:bg-dash-surface-hover transition-colors"
     >
-      <h3 className="text-[11px] font-semibold text-dash-secondary mb-6 flex justify-between items-center z-10 shrink-0 uppercase tracking-widest">
+      <h3 className="text-[11px] font-semibold text-dash-secondary mb-6 flex justify-between items-start z-10 shrink-0 uppercase tracking-widest">
         <span className="flex items-center gap-2">{title}</span>
-        {badge && <div>{badge}</div>}
+        <div className="flex items-center gap-2">
+          {badge && <div>{badge}</div>}
+          <button
+             className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-dash-primary/10 text-dash-primary border border-dash-primary/20 hover:bg-dash-primary/20 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-sm"
+             onClick={() => window.dispatchEvent(new CustomEvent('open-widget-copilot', { detail: { title, data: { insight }, role: '数据分析专家' } }))}
+             title="专家探讨"
+          >
+             ✨ 空中脑暴
+          </button>
+        </div>
       </h3>
       
       {currentStatus === 'loading' && (

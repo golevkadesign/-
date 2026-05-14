@@ -8,6 +8,7 @@ import { chatRouter } from "./server/routes/chat";
 import planRouter from "./server/routes/plan";
 import { profileRouter } from "./server/routes/profile";
 import { sentinelRouter } from "./server/routes/sentinel";
+import { sandboxRouter } from "./server/routes/sandbox";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -67,6 +68,7 @@ async function startServer() {
   app.use("/api/plan", planRouter);
   app.use("/api/profile", profileRouter);
   app.use("/api/sentinel", sentinelRouter);
+  app.use("/api/sandbox", sandboxRouter);
 
   // Health check
   app.get("/api/health", (req, res) => {

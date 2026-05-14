@@ -50,6 +50,7 @@ export const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState
 
   useEffect(() => {
     const handleTrigger = (e: any) => {
+      setIsDrawerOpen(true);
       const msg = e.detail;
       handleAiSubmit(msg);
     };

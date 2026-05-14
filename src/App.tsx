@@ -19,6 +19,7 @@ import { Sparkles, LogOut, ChevronDown, User, Activity, Loader2, RefreshCw, Cpu,
 import Markdown from 'react-markdown';
 import { ChartWidget } from './components/ChartWidget';
 import { ProfileReportView } from './components/ProfileReportView';
+import { WidgetCopilot } from './components/WidgetCopilot';
 
 import { ComponentRegistry, SDUIRenderer } from './lib/sdui-registry';
 
@@ -48,6 +49,16 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showProfileReport, setShowProfileReport] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [copilotConfig, setCopilotConfig] = useState<{isOpen: boolean, title: string, data: any, role: string}>({ isOpen: false, title: '', data: null, role: '' });
+
+  useEffect(() => {
+    const handleOpenCopilot = (e: any) => {
+      const { title, data, role } = e.detail;
+      setCopilotConfig({ isOpen: true, title, data, role });
+    };
+    window.addEventListener('open-widget-copilot', handleOpenCopilot);
+    return () => window.removeEventListener('open-widget-copilot', handleOpenCopilot);
+  }, []);
 
   const donutOption = useMemo(() => getDonutOption(data), [data?.distributions?.liquidity]);
 
@@ -218,9 +229,17 @@ export default function App() {
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
           className="bg-dash-surface border border-dash-subtle rounded-3xl p-6 sm:p-8 relative overflow-hidden group mt-6 mb-6 md:mb-10 shadow-sm transition-colors hover:bg-dash-surface-hover"
         >
-          <h2 className="relative z-10 flex items-center gap-2 text-dash-tertiary text-[11px] font-semibold uppercase tracking-[0.15em] mb-4">
-             <Activity className="w-4 h-4 text-dash-primary"/> Strategic Overview
-          </h2>
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="relative z-10 flex items-center gap-2 text-dash-tertiary text-[11px] font-semibold uppercase tracking-[0.15em]">
+               <Activity className="w-4 h-4 text-dash-primary"/> Strategic Overview
+            </h2>
+            <button
+               className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-dash-primary/10 text-dash-primary border border-dash-primary/20 hover:bg-dash-primary/20 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 z-20 shadow-sm"
+               onClick={() => setCopilotConfig({ isOpen: true, title: 'Strategic Overview', data: data.insights?.global, role: '首席宏观策略师' })}
+            >
+               <Bot className="w-3.5 h-3.5" /> 专家探讨
+            </button>
+          </div>
           <p className="relative z-10 text-dash-primary text-[15px] sm:text-xl font-medium tracking-tight leading-relaxed">
              {data.insights?.global || "Waiting for deep financial sync..."}
           </p>
@@ -567,6 +586,16 @@ export default function App() {
 
       <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
       <ProfileReportView isOpen={showProfileReport} onClose={() => setShowProfileReport(false)} data={data} commitData={commitData} />
+      <WidgetCopilot 
+        isOpen={copilotConfig.isOpen}
+        onClose={() => setCopilotConfig(prev => ({ ...prev, isOpen: false }))}
+        widgetTitle={copilotConfig.title}
+        widgetData={copilotConfig.data}
+        expertRole={copilotConfig.role}
+        onPromoteIntent={(prompt) => {
+           window.dispatchEvent(new CustomEvent('trigger-ai-drawer', { detail: prompt }))
+        }}
+      />
 
       <Drawer 
         isDrawerOpen={isDrawerOpen} 
