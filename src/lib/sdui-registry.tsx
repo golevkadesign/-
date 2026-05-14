@@ -7,6 +7,27 @@ import { ChartWidget } from '../components/ChartWidget';
 import { SDUIComponent } from '../types/terminal';
 
 export const ComponentRegistry: Record<string, React.FC<any>> = {
+  Grid: ({ columns = 1, gap = 4, children, className = "" }) => {
+    const colClass = columns === 4 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 
+                     columns === 3 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 
+                     columns === 2 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1';
+    return (
+      <div className={`grid ${colClass} gap-${gap} ${className}`}>
+        {children}
+      </div>
+    );
+  },
+  Flex: ({ direction = 'col', justify, align, gap = 4, children, className = "" }) => {
+    const justifyClass = justify ? `justify-${justify}` : '';
+    const alignClass = align ? `items-${align}` : '';
+    return (
+      <div className={`flex flex-${direction} gap-${gap} ${justifyClass} ${alignClass} ${className}`}>
+        {children}
+      </div>
+    );
+  },
+  MetricCard: (props) => <Card {...props} />,
+  DynamicChart: (props) => <ChartWidget {...props} />,
   ChartWidget: (props) => <ChartWidget {...props} />,
   MetricsCard: ({ title, value }) => <Card title={title} value={
     typeof value === 'number' ? `$${value.toLocaleString()}` : value
