@@ -5,14 +5,13 @@ export const profileRouter = Router();
 
 profileRouter.post("/generate", async (req, res) => {
   try {
-    const { settings, contextData = {} } = req.body;
-    
-    // Default to gemini-2.5-flash as requested
+    const { data, settings, contextData } = req.body;
+    const finalData = data || contextData || {};
+
     const passedSettings = settings || {};
-    passedSettings.provider = "gemini";
-    // We override model if we can, but let's just make sure we request flash
     const ai = getUniversalAiClient(passedSettings);
-    
+    const targetModel = passedSettings.geminiFastModel || "gemini-2.5-flash"; // 优先使用用户配置
+
     const prompt = `你是一个客观且专业的第三人称资产管理分析旁白。你的任务是基于传入的 JSON 数据，生成一份格式化的自然语言长线记忆报告。
 报告需严格包含以下板块：
 1. 核心画像与性格
@@ -26,11 +25,11 @@ profileRouter.post("/generate", async (req, res) => {
 - 输出纯 Markdown 格式。
 
 【JSON 数据】
-${JSON.stringify(contextData, null, 2)}`;
+${JSON.stringify(finalData, null, 2)}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
+      model: targetModel,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
     res.json({ content: response.text });

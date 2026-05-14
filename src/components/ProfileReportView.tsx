@@ -21,9 +21,10 @@ export const ProfileReportView = ({ isOpen, onClose, data, commitData }: any) =>
       const res = await fetch('/api/profile/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          settings: getSettings(),
+        body: JSON.stringify({ 
+          data: data, 
           contextData: data,
+          settings: getSettings() 
         })
       });
 
