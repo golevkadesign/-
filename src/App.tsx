@@ -1,6 +1,6 @@
 import { getSettings, saveSettings, AppSettings } from './lib/settings';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { getDonutOption, getExpenseOption, getWaterfallOption, getHoldingsOption, getOptionsOption } from './components/chart-configs';
+import { getDonutOption, getExpenseOption, getWaterfallOption, getHoldingsOption, getOptionsOption, getCurrencySymbol } from './components/chart-configs';
 import { Card } from './components/Card';
 import { ReactECharts } from './components/ReactECharts';
 import { SettingsModal } from './components/SettingsModal';
@@ -28,11 +28,13 @@ export interface Attachment {
   isTruncated?: boolean;
 }
 
-const formatMoney = (val: number | undefined | null) =>
-  val == null ? '-' : `¥${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+const formatMoney = (val: number | undefined | null, curr: string = '¥') =>
+  val == null ? '-' : `${curr}${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 
 export default function App() {
   const { user, data, loadingAuth, commitData } = useTerminalSync();
+  const globalCurrencyOption = data?.distributions?.liquidity?.[0]?.currency || 'CNY';
+  const globalCurSymbol = getCurrencySymbol(globalCurrencyOption);
   const { nodePlans, executePlan, clearNodePlans } = useStrategyStream();
 
   const [sduiState, setSduiState] = useState<any[]>([]);
@@ -213,10 +215,10 @@ export default function App() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 pt-0 mb-8"
         >
-          <Card title="总净资产 (Net Worth)" value={formatMoney(data.metrics?.netWorth)} subValue={data.metrics?.netWorthSummary} isLongSubText />
-          <Card title="可用现金池 (Liquidity)" value={formatMoney(data.metrics?.liquidity)} subValue={data.metrics?.liquiditySummary} isLongSubText />
+          <Card title="总净资产 (Net Worth)" value={formatMoney(data.metrics?.netWorth, globalCurSymbol)} subValue={data.metrics?.netWorthSummary} isLongSubText />
+          <Card title="可用现金池 (Liquidity)" value={formatMoney(data.metrics?.liquidity, globalCurSymbol)} subValue={data.metrics?.liquiditySummary} isLongSubText />
           <Card title="抗风险系数 (Safety Ratio)" value={data.metrics?.safetyRatio?.toFixed(2) || '0.00'} subValue={data.metrics?.safetyRatioSummary || '当前流动性支撑乘数'} isLongSubText />
-          <Card title="月自由现金流 (FCF)" value={formatMoney(data.metrics?.fcf)} subValue={data.metrics?.fcfSummary || '测算月结余'} isLongSubText />
+          <Card title="月自由现金流 (FCF)" value={formatMoney(data.metrics?.fcf, globalCurSymbol)} subValue={data.metrics?.fcfSummary || '测算月结余'} isLongSubText />
         </motion.div>
 
       {sduiState.length > 0 && (
@@ -335,11 +337,11 @@ export default function App() {
                     </div>
                     <div className="flex justify-between items-center text-[13px] mb-3">
                        <span className="text-dash-secondary font-mono tracking-wide">Estimated Value</span>
-                       <span className="text-dash-primary font-mono font-bold tracking-tight">¥{(asset.marketValue ?? asset.value ?? 0).toLocaleString()}</span>
+                       <span className="text-dash-primary font-mono font-bold tracking-tight">{getCurrencySymbol(asset.currency || globalCurrencyOption)}{(asset.marketValue ?? asset.value ?? 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center text-[13px] mb-2">
                        <span className="text-dash-secondary font-mono tracking-wide">Debt / Cost</span>
-                       <span className="text-dash-red font-mono font-bold tracking-tight">¥{(asset.holdingCost ?? 0).toLocaleString()}</span>
+                       <span className="text-dash-red font-mono font-bold tracking-tight">{getCurrencySymbol(asset.currency || globalCurrencyOption)}{(asset.holdingCost ?? 0).toLocaleString()}</span>
                     </div>
                  </div>
               ))}
@@ -496,7 +498,7 @@ export default function App() {
           <div className="flex-1">
             <h3 className="text-xl sm:text-2xl font-sans tracking-tight font-medium text-dash-primary break-words">{data.goal?.name || "战略目标"}</h3>
             <p className="text-[13px] text-dash-tertiary mt-2 font-mono break-all sm:break-normal font-medium tracking-wide">
-              PROGRESS TARGET <span className="text-dash-secondary ml-2 font-semibold">¥{(data.goal?.current || 0).toLocaleString()} <span className="text-dash-subtle mx-1">/</span> ¥{(data.goal?.target || 0).toLocaleString()}</span>
+              PROGRESS TARGET <span className="text-dash-secondary ml-2 font-semibold">{globalCurSymbol}{(data.goal?.current || 0).toLocaleString()} <span className="text-dash-subtle mx-1">/</span> {globalCurSymbol}{(data.goal?.target || 0).toLocaleString()}</span>
             </p>
           </div>
           <div className="text-left sm:text-right">
@@ -513,6 +515,13 @@ export default function App() {
       </motion.div>
       )}
       </main>
+
+      {/* Footer Version */}
+      <footer className="text-center pb-8 pt-4">
+        <span className="text-[10px] font-mono text-dash-tertiary uppercase tracking-widest opacity-50">
+          Terminal Build v1.0.3
+        </span>
+      </footer>
 
       {/* Confirm Clear Modal */}
       {showClearConfirm && (

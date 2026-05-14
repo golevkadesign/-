@@ -136,7 +136,7 @@ export const Drawer = ({ isDrawerOpen, setIsDrawerOpen, user, data, setSduiState
               msgs.push({ role: 'user', content: c.user || '', attachments: c.attachments });
            }
            if (c.ai || (i === chatHistory.length - 1 && isLoading) || c.thinking) {
-              msgs.push({ role: 'assistant', content: c.ai || '', thinking: c.thinking, hasMemoryUpdate: c.hasMemoryUpdate, _liveSources: data._liveSources, timeTaken: c.timeTaken });
+              msgs.push({ role: 'assistant', content: c.ai || '', thinking: c.thinking, hasMemoryUpdate: c.hasMemoryUpdate, _liveSources: data._liveSources, timeTaken: c.timeTaken, debugData: (c as any).debugData });
            }
            return msgs;
         }), [chatHistory, isLoading, data._liveSources])} 

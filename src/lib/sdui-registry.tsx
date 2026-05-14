@@ -5,11 +5,7 @@ import { Sparkles, Activity } from 'lucide-react';
 
 export const ComponentRegistry: Record<string, React.FC<any>> = {
   MetricsCard: ({ title, value }) => <Card title={title} value={
-    typeof value === 'string' && value.includes('¥') ? (
-      <span className="tabular-nums">{value}</span>
-    ) : (
-      <span className="tabular-nums">{typeof value === 'number' ? `¥${value.toLocaleString()}` : value}</span>
-    )
+    typeof value === 'number' ? `$${value.toLocaleString()}` : value
   } />,
   EChartsPie: ({ data }) => {
     if (!data || data.length === 0) {

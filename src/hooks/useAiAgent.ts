@@ -13,7 +13,7 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
   const abortControllerRef = useRef<AbortController | null>(null);
   const isChatLoaded = useRef(false);
 
-  const [chatHistory, setChatHistory] = useState<{ user: string, ai: string, attachments: Attachment[], thinking?: string, isThinkingExpanded?: boolean, hasMemoryUpdate?: boolean, _liveSources?: string[], timeTaken?: number }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ user: string, ai: string, attachments: Attachment[], thinking?: string, isThinkingExpanded?: boolean, hasMemoryUpdate?: boolean, _liveSources?: string[], timeTaken?: number, debugData?: any }[]>([]);
 
   useEffect(() => {
     const handleClearChat = () => {
@@ -380,6 +380,7 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
         const newHist = [...prev];
         const displayAi = txt.substring(0, txt.indexOf('```json') !== -1 ? txt.indexOf('```json') : txt.length).trim();
         newHist[newHist.length - 1].ai = displayAi || (sduiPayload ? "> ⚙️ 高级视图数据已同步至终端..." : txt);
+        newHist[newHist.length - 1].debugData = bffData;
         return newHist;
       });
 

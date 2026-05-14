@@ -1,7 +1,19 @@
+export function getCurrencySymbol(currency?: string) {
+  if (!currency) return '$';
+  const c = currency.toUpperCase();
+  if (c === 'USD') return '$';
+  if (c === 'CNY' || c === 'RMB') return '¥';
+  if (c === 'HKD') return 'HK$';
+  return c + ' ';
+}
+
 export function getDonutOption(data: any) {
   const arr = data?.distributions?.liquidity || [];
   return {
-    tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
+    tooltip: { 
+      trigger: 'item', 
+      formatter: (p: any) => `${p.name}: ${getCurrencySymbol(arr[p.dataIndex]?.currency)}${(p.value || 0).toLocaleString()} (${p.percent}%)` 
+    },
     legend: { orient: 'vertical', left: 'left', textStyle: { color: '#cbd5e1' }, top: 'middle' },
     color: ['#14b8a6', '#0ea5e9', '#3b82f6', '#0284c7', '#0369a1'],
     series: [{
@@ -15,7 +27,10 @@ export function getDonutOption(data: any) {
 export function getExpenseOption(data: any) {
   const arr = data?.distributions?.expenses || [];
   return {
-    tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
+    tooltip: { 
+      trigger: 'item', 
+      formatter: (p: any) => `${p.name}: ${getCurrencySymbol(arr[p.dataIndex]?.currency)}${(p.value || 0).toLocaleString()} (${p.percent}%)` 
+    },
     legend: { orient: 'vertical', left: 'left', textStyle: { color: '#cbd5e1' }, top: 'middle' },
     color: ['#0d9488', '#0891b2', '#2563eb', '#1e40af', '#115e59', '#1e3a8a'],
     series: [{
@@ -36,7 +51,15 @@ export function getWaterfallOption(data: any) {
   const mainData = arr.map((v: any) => v.value).concat([total]);
 
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[1].name + ' : ¥' + (p[1].value?.toLocaleString() || 0) },
+    tooltip: { 
+      trigger: 'axis', 
+      axisPointer: { type: 'shadow' }, 
+      formatter: (p: any) => {
+        const idx = p[1].dataIndex;
+        const cur = idx < arr.length ? arr[idx].currency : arr[0]?.currency;
+        return p[1].name + ' : ' + getCurrencySymbol(cur) + (p[1].value?.toLocaleString() || 0);
+      }
+    },
     grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
     xAxis: { type: 'category', splitLine: { show: false }, data: names.length > 1 ? names : ['无数据'], axisLabel: { color: '#cbd5e1', interval: 0, formatter: (val: string) => val.length > 4 ? val.slice(0, 4) + '...' : val } },
     yAxis: { type: 'value', splitLine: { lineStyle: { color: '#334155', type: 'dashed' } }, axisLabel: { show: false } },
@@ -59,7 +82,14 @@ export function getHoldingsOption(data: any) {
   const values = sortedArr.map((v: any) => v.value ?? v.marketValue ?? 0);
   
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[0].name + ' : ¥' + (p[0].value?.toLocaleString() || 0) },
+    tooltip: { 
+      trigger: 'axis', 
+      axisPointer: { type: 'shadow' }, 
+      formatter: (p: any) => {
+        const idx = p[0].dataIndex;
+        return p[0].name + ' : ' + getCurrencySymbol(sortedArr[idx]?.currency) + (p[0].value?.toLocaleString() || 0);
+      }
+    },
     grid: { left: '3%', right: '15%', bottom: '5%', top: '5%', containLabel: true },
     dataZoom: [
       {
@@ -97,7 +127,14 @@ export function getOptionsOption(data: any) {
   const symbols = arr.map((v: any) => v.name || v.symbol || '未知');
   const values = arr.map((v: any) => v.value ?? v.marketValue ?? 0);
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => p[0].name + ' : ¥' + (p[0].value?.toLocaleString() || 0) },
+    tooltip: { 
+      trigger: 'axis', 
+      axisPointer: { type: 'shadow' }, 
+      formatter: (p: any) => {
+        const idx = p[0].dataIndex;
+        return p[0].name + ' : ' + getCurrencySymbol(arr[idx]?.currency) + (p[0].value?.toLocaleString() || 0);
+      }
+    },
     grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
     dataZoom: [
       {

@@ -22,7 +22,7 @@ Task:
 1. requiresDeepAnalysis (boolean): Determine if this message requires full multi-agent deep analysis. Simple greetings, thank yous, daily pleasantries, or non-financial chatting should NOT trigger deep analysis.
 2. quickReply (string): If it DOES NOT need deep analysis, provide a friendly quick reply (less than 60 words).
 3. summarizedIntent (string): If it DOES need deep analysis, summarize the core financial question/intent into a clean instruction for the expert agents.
-4. extractedTickers (string array): Extract ALL stock/crypto/option ticker symbols mentioned (e.g., TSLA, AAPL, BTC-USD). Guess Yahoo Finance supported symbols if unclear.
+4. extractedTickers (string array): Extract valid US/HK/Crypto ticker symbols explicitly mentioned. CRITICAL: NEVER extract generic terms like "A股" as ticker "A". Only extract exact specific companies.
 5. targetModules (string array): Which expert engines are needed? From: ["Debt Focus", "High Net Worth", "General Finance", "Market Analysis", "Devil Advocate"].
 6. updatedProfile (object): Update the user's permanent profile based on ANY new information in the message.
    - Using the following definition schema:
@@ -218,6 +218,9 @@ export async function streamSynthesis(userTier: string, message: string, externa
 - 请在 insights 对象中，提供专门负责该板块的Agent的具体客观分析和切实施政建议。
 - 重要：**增量更新（Differential Update）**。你只需要在 \`updateGlobalState\` 中返回**需要修改或更新**的字段。前端会将你的输出与当前的 Terminal State 进行合并（Shallow Merge / 深层合并）。对于完全没有变化的板块，**请直接省略该字段**，不要输出空数组/空字符串来覆盖原有的有效数据！！比如：如果你本次分析没有涉及 fixedAssets，那么 updateGlobalState 里面就不要出现 fixedAssets 字段。
 - 只做数据的更新，绝不重置旧的有效资产结构。如果在硬核经济策略数据中提到某些数据失效了或被抛售了，那才将其重置为 []。
+- 【数组全量替换原则 (CRITICAL)】：当用户提到生活开支(expenses)、负债(liabilities)或资产配置的变更（例如：房贷被抵扣、清仓某只股票）时，你必须在 JSON 中下发**更新后的完整列表**。前端会直接整体替换，切勿只下发增量或直接省略！
+- 【严禁捏造市值 (CRITICAL)】：在更新 \`publicHoldings\` 时，\`_livePrice\` 和 \`marketValue\` 必须严格使用 \`[MARKET_DATA]\` 中的真实数据。如果缺少某只股票的最新股价，按原样保留，**绝不许凭空幻觉捏造数值或借用其他股票的价格！**
+- 【强制响应原则】：如果你在正文文本中建议了清仓、修改开支，你的 JSON Patch (\`updateGlobalState\`) 中就必须包含对应的字段体现这一变化，不允许口是心非。
 
 当前前端面板状态 (TERMINAL_STATE)：
 ${JSON.stringify({ 

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { cn } from '../../lib/utils';
-import { Send, FileText, Bot, User as UserIcon, Loader2, Activity, ChevronDown, Sparkles, StopCircle, Check, Copy, RefreshCw, MessageSquare, X, Mic, Maximize2, Cpu } from 'lucide-react';
+import { Send, FileText, Bot, User as UserIcon, Loader2, Activity, ChevronDown, Sparkles, StopCircle, Check, Copy, RefreshCw, MessageSquare, X, Mic, Maximize2, Cpu, Download } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -262,6 +262,19 @@ export const ChatList = React.memo(function ChatList({ messages, isTyping, onReg
                                {i === messages.length - 1 && onRegenerate && (
                                  <button onClick={onRegenerate} className="flex items-center gap-1.5 text-xs text-dash-tertiary hover:text-dash-secondary transition-colors px-2 py-1 rounded-lg hover:bg-white/5 uppercase tracking-wide">
                                    <RefreshCw className="w-3.5 h-3.5" /> 重算 (Regenerate)
+                                 </button>
+                               )}
+                               {msg.debugData && (
+                                 <button onClick={() => {
+                                     const blob = new Blob([JSON.stringify(msg.debugData, null, 2)], { type: 'application/json' });
+                                     const url = URL.createObjectURL(blob);
+                                     const a = document.createElement('a');
+                                     a.href = url;
+                                     a.download = `terminal-node-data-${Date.now()}.json`;
+                                     a.click();
+                                     URL.revokeObjectURL(url);
+                                 }} className="flex items-center gap-1.5 text-xs text-dash-tertiary hover:text-dash-secondary transition-colors px-2 py-1 rounded-lg hover:bg-white/5 uppercase tracking-wide">
+                                     <Download className="w-3.5 h-3.5" /> 下载节点数据 (JSON)
                                  </button>
                                )}
                              </div>

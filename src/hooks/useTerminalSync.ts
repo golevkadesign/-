@@ -3,7 +3,7 @@ import { subscribeToAuthChanges, db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { TerminalState } from '../types/terminal';
 import { sanitizeTerminalState } from '../lib/sanitizer';
-import { merge } from 'lodash-es';
+import { mergeWith, isArray } from 'lodash-es';
 
 export const EMPTY_STATE: TerminalState = {
   userPersona: { tags: [], description: "唤起总监生成您的个人资产画像模型" },
@@ -97,8 +97,12 @@ export function useTerminalSync() {
       const rawNewData = typeof newDataOrUpdater === 'function' ? newDataOrUpdater(prev) : newDataOrUpdater;
       const newData = sanitizeTerminalState(rawNewData) as TerminalState;
       
-      // 使用 lodash 的 merge 进行深度防御性合并，不再丢失旧有模块的数据
-      const fullData = merge({}, prev, newData);
+      // 使用 mergeWith 进行防御性合并，并在遇到数组时直接覆盖，防止出现数组索引混合污染
+      const fullData = mergeWith({}, prev, newData, (objValue, srcValue) => {
+        if (isArray(srcValue)) {
+          return srcValue; // 数组全量替换，不执行深度合并
+        }
+      });
       
       if (user?.uid) {
           localStorage.setItem(`ai_terminal_data_${user.uid}`, JSON.stringify(fullData));
