@@ -81,9 +81,6 @@ export function TerminalHeader({
                     <p className="text-[13px] font-bold text-dash-primary truncate">{user.displayName}</p>
                     <p className="text-[11px] font-mono tracking-wide text-dash-tertiary truncate">{user.email}</p>
                   </div>
-                  <button onClick={() => setShowProfileReport(true)} className="w-full flex items-center gap-2 text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover p-2.5 rounded-xl text-xs font-semibold transition-colors mb-1 uppercase tracking-wide">
-                    <User className="w-4 h-4" /> 长线记忆
-                  </button>
                   <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-2 text-dash-secondary hover:text-dash-primary hover:bg-dash-surface-hover p-2.5 rounded-xl text-xs font-semibold transition-colors mb-1 uppercase tracking-wide">
                     <Settings className="w-4 h-4" /> Settings
                   </button>

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Card } from '../components/Card';
 import { ReactECharts } from '../components/ReactECharts';
 import { Sparkles, Activity, AlertTriangle, Zap, ArrowRight, ShieldAlert } from 'lucide-react';
-import { getSDUIPieOption, getDonutOption, getExpenseOption, getWaterfallOption, getHoldingsOption, getOptionsOption } from '../components/chart-configs';
+import { getSDUIPieOption, getDonutOption, getExpenseOption, getWaterfallOption, getHoldingsOption, getOptionsOption, getCurrencySymbol } from '../components/chart-configs';
 import { ChartWidget } from '../components/ChartWidget';
 import { SDUIComponent } from '../types/terminal';
 
@@ -22,7 +22,13 @@ export const ComponentRegistry: Record<string, React.FC<any>> = {
   MetricCard: ({ title, dataKey, isLongSubText, globalData }) => {
     const metrics = globalData?.metrics || {};
     const valueNum = metrics[dataKey];
-    const valueStr = valueNum !== undefined ? `$${Number(valueNum).toLocaleString()}` : 'N/A';
+    let currency = 'USD';
+    const dist = globalData?.distributions;
+    if (dist?.liquidity?.[0]?.currency) currency = dist.liquidity[0].currency;
+    else if (dist?.publicHoldings?.[0]?.currency) currency = dist.publicHoldings[0].currency;
+    else if (dist?.privateAssets?.[0]?.currency) currency = dist.privateAssets[0].currency;
+    const sym = getCurrencySymbol(currency);
+    const valueStr = valueNum !== undefined ? `${sym}${Number(valueNum).toLocaleString()}` : 'N/A';
     const subValue = metrics[`${dataKey}Summary`] || '';
     return <Card title={title} value={valueStr} subValue={subValue} isLongSubText={isLongSubText} />;
   },
@@ -53,9 +59,15 @@ export const ComponentRegistry: Record<string, React.FC<any>> = {
     );
   },
   ChartWidget: (props) => <ChartWidget {...props} />,
-  MetricsCard: ({ title, value }) => <Card title={title} value={
-    typeof value === 'number' ? `$${value.toLocaleString()}` : value
-  } />,
+  MetricsCard: ({ title, value, globalData }) => {
+    let currency = 'USD';
+    const dist = globalData?.distributions;
+    if (dist?.liquidity?.[0]?.currency) currency = dist.liquidity[0].currency;
+    else if (dist?.publicHoldings?.[0]?.currency) currency = dist.publicHoldings[0].currency;
+    else if (dist?.privateAssets?.[0]?.currency) currency = dist.privateAssets[0].currency;
+    const sym = getCurrencySymbol(currency);
+    return <Card title={title} value={ typeof value === 'number' ? `${sym}${value.toLocaleString()}` : value } />
+  },
   EChartsPie: ({ data }) => {
     const option = useMemo(() => getSDUIPieOption(data), [data]);
 
