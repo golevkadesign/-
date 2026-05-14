@@ -62,6 +62,13 @@ export interface LifeStrategy {
   timeNode: string;
 }
 
+export interface SDUIComponent {
+  id: string;
+  type: string;
+  props: Record<string, any>;
+  children?: SDUIComponent[];
+}
+
 export interface TerminalState {
   userPersona: UserPersona;
   userProfile: UserProfile;
@@ -72,5 +79,6 @@ export interface TerminalState {
   lifeStrategiesShort: LifeStrategy[];
   lifeStrategiesLong: LifeStrategy[];
   _liveSources?: string[];
+  sduiSchema?: SDUIComponent[];
   [key: string]: any;
 }

@@ -18,7 +18,7 @@ import { Sparkles, LogOut, ChevronDown, User, Activity, Loader2, RefreshCw, Cpu,
 import Markdown from 'react-markdown';
 import { ChartWidget } from './components/ChartWidget';
 
-import { ComponentRegistry } from './lib/sdui-registry';
+import { ComponentRegistry, SDUIRenderer } from './lib/sdui-registry';
 
 export interface Attachment {
   mimeType: string;
@@ -221,13 +221,10 @@ export default function App() {
           <Card title="月自由现金流 (FCF)" value={formatMoney(data.metrics?.fcf, globalCurSymbol)} subValue={data.metrics?.fcfSummary || '测算月结余'} isLongSubText />
         </motion.div>
 
-      {sduiState.length > 0 && (
+      {(data.sduiSchema?.length > 0 || sduiState.length > 0) && (
         <div className="mb-10 w-full">
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {sduiState.map((block, i) => {
-               const Component = ComponentRegistry[block.component];
-               return Component ? <Component key={i} {...block.props} /> : null;
-             })}
+             <SDUIRenderer schema={data.sduiSchema || sduiState} />
            </div>
         </div>
       )}

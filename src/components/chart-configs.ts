@@ -7,6 +7,13 @@ export function getCurrencySymbol(currency?: string) {
   return c + ' ';
 }
 
+export function getSDUIPieOption(data: any) {
+  return { 
+    tooltip: { trigger: 'item' }, 
+    series: [{ type: 'pie', data, radius: ['40%', '70%'] }] 
+  };
+}
+
 export function getDonutOption(data: any) {
   const arr = data?.distributions?.liquidity || [];
   return {

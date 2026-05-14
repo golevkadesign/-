@@ -1,13 +1,19 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card } from '../components/Card';
 import { ReactECharts } from '../components/ReactECharts';
 import { Sparkles, Activity } from 'lucide-react';
+import { getSDUIPieOption } from '../components/chart-configs';
+import { ChartWidget } from '../components/ChartWidget';
+import { SDUIComponent } from '../types/terminal';
 
 export const ComponentRegistry: Record<string, React.FC<any>> = {
+  ChartWidget: (props) => <ChartWidget {...props} />,
   MetricsCard: ({ title, value }) => <Card title={title} value={
     typeof value === 'number' ? `$${value.toLocaleString()}` : value
   } />,
   EChartsPie: ({ data }) => {
+    const option = useMemo(() => getSDUIPieOption(data), [data]);
+
     if (!data || data.length === 0) {
       return (
         <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 h-[350px] shadow-sm flex flex-col items-center justify-center animate-pulse">
@@ -19,7 +25,7 @@ export const ComponentRegistry: Record<string, React.FC<any>> = {
     return (
       <div className="bg-dash-surface-hover rounded-3xl border border-dash-subtle p-6 h-[350px] shadow-sm flex flex-col">
          <div className="flex-1 min-h-0">
-            <ReactECharts option={{ tooltip: { trigger: 'item' }, series: [{ type: 'pie', data, radius: ['40%', '70%'] }] }} />
+            <ReactECharts option={option} />
          </div>
       </div>
     );
@@ -70,4 +76,28 @@ export const ComponentRegistry: Record<string, React.FC<any>> = {
       {message}
     </div>
   )
+};
+
+export const SDUIRenderer = ({ schema }: { schema?: SDUIComponent[] }) => {
+  if (!schema || !Array.isArray(schema)) return null;
+
+  return (
+    <>
+      {schema.map((block, i) => {
+        const Component = ComponentRegistry[block.type] || ComponentRegistry[block.component];
+        if (!Component) {
+           return (
+             <div key={block.id || i} className="p-4 border border-dash-subtle rounded-xl bg-dash-surface text-dash-tertiary text-sm mb-4 border-dashed">
+               Unknown Component: {block.type || block.component}
+             </div>
+           );
+        }
+        return (
+           <Component key={block.id || i} {...block.props}>
+              {block.children && <SDUIRenderer schema={block.children} />}
+           </Component>
+        );
+      })}
+    </>
+  );
 };
