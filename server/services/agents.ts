@@ -48,6 +48,7 @@ export async function runAnalysisAgent(userTier: string, contextData: any, histo
         ],
         config: {
           temperature: 0.2, // 保持专业性和稳定性
+          tools: [{ googleSearch: {} }],
         }
       }),
       new Promise<any>((_, reject) => { timeoutId = setTimeout(() => reject(new Error('Agent AI Timeout')), 60000); })
