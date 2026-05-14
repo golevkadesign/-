@@ -25,6 +25,7 @@
     "echarts": "^6.0.0",
     "express": "^4.21.2",
     "firebase": "^12.12.1",
+    "lodash-es": "^4.18.1",
     "longbridge": "^4.0.5",
     "lucide-react": "^0.546.0",
     "motion": "^12.38.0",
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
+    "@types/lodash-es": "^4.17.12",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.0",

@@ -299,10 +299,11 @@ export function useAiAgent({ user, data, commitData, setSduiState, setIsSynthesi
                          return newHist;
                       });
                    } else if (parsed.type === 'error') {
-                      serverError = parsed.error;
+                      serverError = parsed.error || parsed.message || "Unknown Backend Server Error (无明确错误信息)";
                    }
-                } catch(e) {
+                } catch(e: any) {
                    console.error("SSE JSON Parse Error for line:", dataStr, e);
+                   // 如果是严重格式错误，不要继续静默
                 }
              }
           }

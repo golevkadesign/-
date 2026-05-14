@@ -214,7 +214,7 @@ export async function streamSynthesis(userTier: string, message: string, externa
 - 对于股票持仓(publicHoldings)：如果有新分析，则在 \`insights.publicText\` 中输出纯文字结论（一只股票一行信息，枚举数量/成本/市值等）；在 \`insights.publicSummary\` 输出总体总结。
 - 对于期权(options)：提取并枚举。
 - 【严禁捏造Mock假数据】决不允许凭空捏造数值！
-- 必须在 \`updateGlobalState.insights.global\` 字段中输出一段高度提炼、犀利且具有前瞻性的全局资产战略总结（不少于 50 字）。该 \`global\` 字段是前端面板最顶部的"Strategic Overview"数据来源，严禁遗漏！！
+- 必须在 \`updateGlobalState.insights.global\` 字段中，输出一段高度提炼、犀利且具有前瞻性的【全局资产战略总结】（不少于 50 字）。这是控制台顶部的核心数据，严禁遗漏！
 - 请在 insights 对象中，提供专门负责该板块的Agent的具体客观分析和切实施政建议。
 - 重要：**增量更新（Differential Update）**。你只需要在 \`updateGlobalState\` 中返回**需要修改或更新**的字段。前端会将你的输出与当前的 Terminal State 进行合并（Shallow Merge / 深层合并）。对于完全没有变化的板块，**请直接省略该字段**，不要输出空数组/空字符串来覆盖原有的有效数据！！比如：如果你本次分析没有涉及 fixedAssets，那么 updateGlobalState 里面就不要出现 fixedAssets 字段。
 - 只做数据的更新，绝不重置旧的有效资产结构。如果在硬核经济策略数据中提到某些数据失效了或被抛售了，那才将其重置为 []。
@@ -239,7 +239,7 @@ ${JSON.stringify({
     "lifeStrategiesShort": [ { "timeNode": "2024-2025", "title": "节点1", "description": "描述" } ],
     "lifeStrategiesLong": [ { "timeNode": "未来 10 年", "title": "高维规划", "description": "描述" } ],
     "insights": { 
-      "global": "一段高度提炼、犀利且具有前瞻性的全局资产战略总结（不少于50字）...",
+      "global": "在这里输出全局资产战略总结...",
       "liquidity": "资金池流动性建议..."
     }
   }

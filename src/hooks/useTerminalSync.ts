@@ -3,6 +3,7 @@ import { subscribeToAuthChanges, db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { TerminalState } from '../types/terminal';
 import { sanitizeTerminalState } from '../lib/sanitizer';
+import { merge } from 'lodash-es';
 
 export const EMPTY_STATE: TerminalState = {
   userPersona: { tags: [], description: "唤起总监生成您的个人资产画像模型" },
@@ -96,21 +97,8 @@ export function useTerminalSync() {
       const rawNewData = typeof newDataOrUpdater === 'function' ? newDataOrUpdater(prev) : newDataOrUpdater;
       const newData = sanitizeTerminalState(rawNewData) as TerminalState;
       
-      const mergedMetrics = { ...prev.metrics, ...rawNewData.metrics, ...newData.metrics };
-      const mergedDistributions = { ...prev.distributions, ...rawNewData.distributions, ...newData.distributions };
-      const mergedInsights = { ...prev.insights, ...rawNewData.insights, ...newData.insights };
-      const mergedGoal = { ...prev.goal, ...rawNewData.goal, ...newData.goal };
-      
-      // ensure we don't drop fields not processed by sanitizer but merged from old states
-      const fullData = { 
-          ...prev, 
-          ...rawNewData, 
-          ...newData,
-          metrics: mergedMetrics,
-          distributions: mergedDistributions,
-          insights: mergedInsights,
-          goal: mergedGoal
-      };
+      // 使用 lodash 的 merge 进行深度防御性合并，不再丢失旧有模块的数据
+      const fullData = merge({}, prev, newData);
       
       if (user?.uid) {
           localStorage.setItem(`ai_terminal_data_${user.uid}`, JSON.stringify(fullData));
