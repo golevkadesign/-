@@ -2,6 +2,36 @@ import { Router } from "express";
 import { getUniversalAiClient } from "../utils/ai-universal";
 
 export const sentinelRouter = Router();
+const clients = new Set<any>();
+
+sentinelRouter.get('/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  clients.add(res);
+  req.on('close', () => { clients.delete(res); });
+});
+
+sentinelRouter.post('/evaluate', async (req, res) => {
+  // 模拟后台大模型发现了极其严重的宏观异动，生成了 Generative UI 警报
+  const alertPayload = {
+    type: "Box",
+    props: { bg: "danger-muted", border: "danger", padding: "lg", className: "rounded-2xl flex flex-col gap-4 shadow-2xl animate-in fade-in slide-in-from-top-4" },
+    children: [
+      { type: "Badge", props: { intent: "critical", text: "Sentinel 主动防御预警" } },
+      { type: "Typography", props: { variant: "h3-serif", color: "danger", text: "检测到核心持仓发生剧烈异动" } },
+      { type: "Typography", props: { variant: "body", color: "text-muted", text: "系统后台监控到您的科技股底仓在盘前出现 >8% 的剧烈回撤，流动性风险骤增。" } },
+      { type: "ActionButton", props: { variant: "danger", label: "⚡️ 唤醒债务与量化专家进行深度对冲评估", actionIntent: "请帮我针对盘前科技股大跌，制定具体的债务重组和资产对冲方案" } }
+    ]
+  };
+
+  const sseData = `data: ${JSON.stringify({ type: 'alert', payload: alertPayload })}\n\n`;
+  clients.forEach(client => client.write(sseData));
+  
+  res.json({ success: true, broadcastCount: clients.size });
+});
 
 sentinelRouter.post("/scan", async (req, res) => {
   try {
