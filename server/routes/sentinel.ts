@@ -4,6 +4,9 @@ import { getUniversalAiClient } from "../utils/ai-universal";
 export const sentinelRouter = Router();
 const clients = new Set<any>();
 
+let lastTriggerTime = 0;
+const COOLDOWN_MS = 3600000; // 1小时冷却
+
 sentinelRouter.get('/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
@@ -34,6 +37,11 @@ sentinelRouter.post('/evaluate', async (req, res) => {
 });
 
 sentinelRouter.post("/scan", async (req, res) => {
+  const now = Date.now();
+  if (now - lastTriggerTime < COOLDOWN_MS) {
+    return res.json({ success: true, triggered: false, reason: "Sentinel is cooling down." });
+  }
+
   try {
     const { terminalState, settings } = req.body;
     
@@ -98,6 +106,8 @@ ${JSON.stringify(terminalState, null, 2)}`;
     }
 
     if (jsonResult.triggered && jsonResult.generativeUI) {
+      lastTriggerTime = Date.now(); // 💥 记录触发时间，进入冷却
+      
       // 💥 核心：将 AI 实时生成的 UI 积木，通过 SSE 广播给所有在线终端！
       const sseData = `data: ${JSON.stringify({ type: 'alert', payload: jsonResult.generativeUI })}\n\n`;
       clients.forEach(client => client.write(sseData));
