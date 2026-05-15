@@ -39,7 +39,7 @@ sentinelRouter.post('/evaluate', async (req, res) => {
 sentinelRouter.post("/scan", async (req, res) => {
   const now = Date.now();
   if (now - lastTriggerTime < COOLDOWN_MS) {
-    return res.json({ success: true, triggered: false, reason: "Sentinel is cooling down." });
+    return res.json({ success: true, triggered: false, reason: "Sentinel is cooling down to save costs." });
   }
 
   try {
@@ -106,7 +106,7 @@ ${JSON.stringify(terminalState, null, 2)}`;
     }
 
     if (jsonResult.triggered && jsonResult.generativeUI) {
-      lastTriggerTime = Date.now(); // 💥 记录触发时间，进入冷却
+      lastTriggerTime = Date.now(); // 💥 记录触发时间，进入 1 小时冷却
       
       // 💥 核心：将 AI 实时生成的 UI 积木，通过 SSE 广播给所有在线终端！
       const sseData = `data: ${JSON.stringify({ type: 'alert', payload: jsonResult.generativeUI })}\n\n`;

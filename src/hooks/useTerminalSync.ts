@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { subscribeToAuthChanges, db } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { TerminalState } from '../types/terminal';
 import { sanitizeTerminalState } from '../lib/sanitizer';
 import { mergeWith, isArray, debounce } from 'lodash-es';
@@ -47,64 +47,54 @@ export function useTerminalSync() {
        return;
     }
 
-    const unsubscribe = subscribeToAuthChanges(async (u) => {
-      setUser(u);
-      if (u) {
-         let localState: TerminalState = EMPTY_STATE;
-         let cloudHydrated = false;
+    let unsubscribeSnapshot: (() => void) | undefined;
 
-         // Fetch userProfile and appData from Firestore FIRST (Cloud-First Hydration)
-         try {
-           const profileSnap = await getDoc(doc(db, "userProfiles", u.uid));
-           if (profileSnap.exists()) {
-              const fsData = profileSnap.data();
-              if (fsData.appData && Object.keys(fsData.appData).length > 0) {
-                 localState = { ...EMPTY_STATE, ...fsData.appData };
-                 cloudHydrated = true;
-              }
-              if (fsData.userProfile) {
-                 localState = { ...localState, userProfile: fsData.userProfile };
-              } else if (!fsData.appData && !fsData.chatHistory) {
-                 localState = { ...localState, userProfile: fsData };
-              }
-              
-              if (cloudHydrated || fsData.userProfile || (!fsData.appData && !fsData.chatHistory)) {
-                 localStorage.setItem(`ai_terminal_data_${u.uid}`, JSON.stringify(localState));
-                 cloudHydrated = true;
-              }
-           }
-         } catch(e: any) {
-           if (e.message && e.message.includes('offline')) {
-             console.log("Offline mode: using local state fallback.");
-           } else {
-             console.error("Failed to load user profile from firestore:", e);
-           }
-         }
-         
-         // Fallback to localStorage if cloud hydration failed or empty
-         if (!cloudHydrated) {
-            const stored = localStorage.getItem(`ai_terminal_data_${u.uid}`);
-            if (stored) {
-                try { localState = { ...EMPTY_STATE, ...JSON.parse(stored) }; } catch { localState = EMPTY_STATE; }
+    const unsubscribeAuth = subscribeToAuthChanges((u) => {
+      setUser(u);
+      
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = undefined;
+      }
+
+      if (u) {
+         unsubscribeSnapshot = onSnapshot(doc(db, "userProfiles", u.uid), (snapshot) => {
+            if (snapshot.exists()) {
+               const fsData = snapshot.data();
+               let localState: TerminalState = EMPTY_STATE;
+               
+               if (fsData.appData && Object.keys(fsData.appData).length > 0) {
+                  localState = { ...EMPTY_STATE, ...fsData.appData };
+               }
+               if (fsData.userProfile) {
+                  localState = { ...localState, userProfile: fsData.userProfile };
+               } else if (!fsData.appData && !fsData.chatHistory) {
+                  localState = { ...localState, userProfile: fsData };
+               }
+               
+               setData(sanitizeTerminalState(localState) as TerminalState);
             } else {
-                const oldStored = localStorage.getItem('ai_terminal_data');
-                if (oldStored) {
-                    try { 
-                        localState = { ...EMPTY_STATE, ...JSON.parse(oldStored) };
-                        localStorage.setItem(`ai_terminal_data_${u.uid}`, oldStored);
-                        localStorage.removeItem('ai_terminal_data');
-                    } catch { localState = EMPTY_STATE; }
-                }
+               // 💥 修复清空残留：如果远程文档被删除了，本地立刻归零
+               console.log("Terminal: Remote document deleted, resetting local state.");
+               setData(EMPTY_STATE);
             }
-         }
-         
-         setData(sanitizeTerminalState(localState) as TerminalState);
+            setLoadingAuth(false);
+         }, (error) => {
+            console.error("Firestore sync error:", error);
+            setLoadingAuth(false);
+         });
       } else {
          setData(EMPTY_STATE);
+         setLoadingAuth(false);
       }
-      setLoadingAuth(false);
     });
-    return () => unsubscribe();
+    
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
   }, []);
 
   const commitData = (newDataOrUpdater: any) => {
