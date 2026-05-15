@@ -45,7 +45,7 @@ export default function App() {
   const { nodePlans, executePlan, clearNodePlans } = useStrategyStream();
   const { isDrawerOpen, setDrawerOpen, copilotConfig, closeCopilot, openCopilot, openDrawerWithIntent } = useInteractionStore();
 
-  useSentinel(commitData);
+  useSentinel(data, commitData);
 
   const [sduiState, setSduiState] = useState<any[]>([]);
   const [isSynthesizing, setIsSynthesizing] = useState(false);

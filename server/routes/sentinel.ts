@@ -38,8 +38,8 @@ sentinelRouter.post("/scan", async (req, res) => {
     const { terminalState, settings } = req.body;
     
     const passedSettings = settings || {};
-    passedSettings.provider = "gemini";
     const ai = getUniversalAiClient(passedSettings);
+    const targetModel = passedSettings.geminiFastModel || "gemini-2.5-flash";
 
     const prompt = `你是一个冷酷、敏锐的系统级守护进程（Sentinel 守护进程）。你的唯一任务是基于传入的用户终端资产状态数据（JSON），执行极速的安全与异动巡检。
 
@@ -62,7 +62,7 @@ sentinelRouter.post("/scan", async (req, res) => {
 ${JSON.stringify(terminalState, null, 2)}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: targetModel,
       contents: prompt,
       config: {
         responseMimeType: "application/json"
