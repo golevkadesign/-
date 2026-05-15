@@ -41,20 +41,29 @@ sentinelRouter.post("/scan", async (req, res) => {
     const ai = getUniversalAiClient(passedSettings);
     const targetModel = passedSettings.geminiFastModel || "gemini-2.5-flash";
 
-    const prompt = `你是一个冷酷、敏锐的系统级守护进程（Sentinel 守护进程）。你的唯一任务是基于传入的用户终端资产状态数据（JSON），执行极速的安全与异动巡检。
+    const prompt = `你是一个冷酷、敏锐的系统级守护进程（Sentinel）。你的唯一任务是基于传入的用户终端资产状态数据（JSON），执行极速的安全与异动巡检。
 
 【巡检逻辑】：
-分析资产集中度、流动性枯竭风险、极度高风险标的（如期权占比是否过高、非流动资产是否超过 60% 等）、严重负债等问题。当期权/非流动资产占比超过 60% 时，强制触发降杠杆干预。如果发现任何危及系统账户基础安全的严重风险点，强制唤起主动干预卡片。如果整体健康，则保持静默。
+分析流动性枯竭风险、期权高杠杆、严重负债等。当期权/非流动资产占比过高，或发现危及系统安全的严重风险时，必须触发警报！如果整体健康，则保持静默。
+
+【Generative UI 契约 (CRITICAL)】：
+如果决定触发警报，你必须现场设计一张视觉冲击力极强的 UI 卡片。
+可用原子组件：
+- Box: props 包含 bg (如 danger-muted), border (如 danger), padding (lg), className (如 flex flex-col gap-4 rounded-2xl)
+- Badge: props 包含 intent (critical, warning), text
+- Typography: props 包含 variant (h3-serif, body), color (danger, text-muted), text
+- ActionButton: props 包含 variant (danger, primary), label, actionIntent (极其重要，这是点击后发给全局大脑的指令)
 
 强制输出严格的 JSON 结构：
 {
   "triggered": true,
-  "reason": "触发内部判定逻辑的简要原因",
-  "cardProps": {
-    "title": "🚨 警报标题",
-    "description": "...",
-    "level": "critical",
-    "actions": [ { "label": "...", "prompt": "...", "type": "primary" } ]
+  "reason": "触发原因",
+  "generativeUI": {
+    "type": "Box",
+    "props": { "bg": "danger-muted", "border": "danger", "padding": "lg", "className": "rounded-2xl flex flex-col gap-4 shadow-xl" },
+    "children": [
+       // 在这里组装 Badge, Typography, ActionButton
+    ]
   }
 }
 
@@ -88,7 +97,13 @@ ${JSON.stringify(terminalState, null, 2)}`;
       }
     }
 
-    res.json(jsonResult);
+    if (jsonResult.triggered && jsonResult.generativeUI) {
+      // 💥 核心：将 AI 实时生成的 UI 积木，通过 SSE 广播给所有在线终端！
+      const sseData = `data: ${JSON.stringify({ type: 'alert', payload: jsonResult.generativeUI })}\n\n`;
+      clients.forEach(client => client.write(sseData));
+    }
+
+    res.json({ success: true, triggered: jsonResult.triggered, reason: jsonResult.reason });
   } catch (error: any) {
     console.error("Sentinel scan error:", error);
     res.json({ triggered: false, reason: "Error evaluating risk: " + error.message });

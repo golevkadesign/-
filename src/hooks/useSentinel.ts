@@ -1,10 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { TerminalState } from '../types/terminal';
 import { getSettings } from '../lib/settings';
 
 export function useSentinel(data: any, commitData: any) {
-  const hasScanned = useRef(false);
-
   useEffect(() => {
     const eventSource = new EventSource('/api/sentinel/stream');
 
@@ -27,53 +25,28 @@ export function useSentinel(data: any, commitData: any) {
   }, [commitData]);
 
   useEffect(() => {
-    // 确保有基础数据且本次会话未扫描
-    if (!hasScanned.current && data && Object.keys(data.metrics || {}).length > 0) {
-      hasScanned.current = true;
+    if (!data || Object.keys(data.metrics || {}).length === 0) return;
 
-      // 静默执行巡检
-      const runSentinel = async () => {
-        try {
-          const res = await fetch('/api/sentinel/scan', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              terminalState: data,
-              settings: getSettings()
-            })
-          });
+    const runSentinel = async () => {
+      try {
+        await fetch('/api/sentinel/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ terminalState: data, settings: getSettings() })
+        });
+      } catch (e) {
+        console.error("Sentinel heartbeat failed:", e);
+      }
+    };
 
-          if (res.ok) {
-            const result = await res.json();
-            if (result.triggered && result.cardProps) {
-              const newCard = {
-                id: "sentinel-alert-" + Date.now(),
-                type: "InterventionCard",
-                props: result.cardProps
-              };
+    // 初始延迟 5 秒执行第一次
+    const initialTimer = setTimeout(() => runSentinel(), 5000);
+    // 之后每 30 秒执行一次心跳巡检
+    const intervalTimer = setInterval(() => runSentinel(), 30000);
 
-              commitData((prev: TerminalState) => {
-                const existingWidgets = prev.dynamicWidgets || [];
-                // 防抖：如果已经有同名警告，就不重复添加
-                if (existingWidgets.some((c: any) => c.type === 'InterventionCard' && c.props?.title === result.cardProps.title)) {
-                  return prev;
-                }
-                return {
-                  ...prev,
-                  dynamicWidgets: [newCard, ...existingWidgets] // 💥 修复：写入 dynamicWidgets
-                };
-              });
-            }
-          }
-        } catch (e) {
-          console.error("Sentinel scan failed:", e);
-        }
-      };
-
-      // 延迟扫描，不阻塞首屏渲染
-      setTimeout(() => {
-        runSentinel();
-      }, 3000);
-    }
-  }, [data, commitData]);
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalTimer);
+    };
+  }, [data]);
 }
