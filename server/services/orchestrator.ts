@@ -230,6 +230,12 @@ export async function streamSynthesis(userTier: string, message: string, externa
 - 【强制响应原则】：如果你在正文文本中建议了清仓、修改开支，你的 JSON Patch (\`updateGlobalState\`) 中就必须包含对应的字段体现这一变化，不允许口是心非。
 - 【主动干预原则 (CRITICAL)】：如果用户明确要求渲染干预卡片，或者你判定当前面临极端的宏观异动/账户危机，你必须在 \`updateGlobalState.dynamicWidgets\` 数组中下发一个 \`InterventionCard\`。
 - 【双轨布局原则 (CRITICAL)】：前端页面分为两层。\`updateGlobalState.dynamicWidgets\` 用于你下发临时的干预卡片（如 InterventionCard）或系统警报，渲染在最顶部。\`updateGlobalState.dashboardSchema\` 是底层的图表网格基座。你**平时严禁输出 \`dashboardSchema\` 字段**，前端会自动保留原有的全面图表。只有当你明确判定用户的资产结构发生根本性改变，需要彻底隐藏某些图表时，你才能下发一个全新的 \`dashboardSchema\` 数组去覆盖重排版整个页面。
+- 【原子化生成式 UI (Generative UI)】：当需要下发战术干预、严重警报或特殊操作时，你可以在 \`dynamicWidgets\` 中自由组装原子组件。
+可用原子库：
+  - \`Box\`: 容器。props 包含 bg (surface-elevated, danger-muted, warning-muted等), border (border-subtle, danger, warning), padding (md, lg)。
+  - \`Typography\`: 文本。props 包含 variant (h2, h3, h3-serif, body, body-sm), color (text-primary, text-muted, danger, warning), text。
+  - \`Badge\`: 标签。props 包含 intent (critical, warning, success, default), text。
+  - \`ActionButton\`: 交互按钮。props 包含 variant (primary, danger, outline), label, actionIntent (点击后触发的后续全局 Prompt 指令，极其重要！)。
 
 当前前端面板状态 (TERMINAL_STATE)：
 ${JSON.stringify({ 
@@ -245,25 +251,21 @@ ${JSON.stringify({
   "updateGlobalState": {
     "dynamicWidgets": [
       {
-        "id": "alert-001",
-        "type": "InterventionCard",
-        "props": {
-          "title": "🚨 宏观异动：纳斯达克盘前重挫",
-          "description": "系统监测到科技股发生踩踏式抛售，建议立即对冲。",
-          "level": "critical",
-          "actions": [
-            {
-              "label": "生成期权对冲策略",
-              "prompt": "请帮我测算买入 SQQQ 对冲 30% 风险敞口的具体成本和执行方案",
-              "type": "primary"
-            },
-            {
-              "label": "忽略警报",
-              "prompt": "我选择死扛，请重新评估危险指数",
-              "type": "secondary"
-            }
-          ]
-        }
+        "type": "Box",
+        "props": { "bg": "danger-muted", "border": "danger", "padding": "lg", "className": "rounded-2xl mb-6 flex flex-col gap-4" },
+        "children": [
+          { "type": "Badge", "props": { "intent": "critical", "text": "最高优先级警报" } },
+          { "type": "Typography", "props": { "variant": "h3-serif", "color": "danger", "text": "现金流断裂风险极高" } },
+          { "type": "Typography", "props": { "variant": "body", "color": "text-muted", "text": "您的房贷支出已显著超出安全边际，建议立刻启动防御对冲预案。" } },
+          { 
+            "type": "ActionButton", 
+            "props": { 
+               "variant": "danger", 
+               "label": "⚡️ 授权一键对冲并重组债务", 
+               "actionIntent": "请帮我制定具体的债务重组和资产抛售对冲方案" 
+            } 
+          }
+        ]
       }
     ],
     "metrics": { "netWorth": 1000000, "netWorthSummary": "总结短句..." },
